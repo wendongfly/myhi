@@ -2,6 +2,15 @@
 
 最新版本在上。This project follows the npm package versions of `@wendongfly/myhi`.
 
+## 1.3.230 — 安全更新 / Security update
+
+- **依赖漏洞修复**：升级 express 4.22.3、socket.io / socket.io-client 4.8.4、multer 2.5.0 及其间接依赖（engine.io、ws、socket.io-parser、body-parser、proxy-addr、qs、node-forge），`npm audit` 0 个漏洞。其中最要紧的是 Socket.IO 底层**无需登录**即可触发的拒绝服务；这些包虽列在 devDependencies，但会被打包进 `dist/` 随 npm 包发布，**建议所有用户升级**。
+- **错误信息不再泄露服务器路径**：畸形或超大的请求体以前会返回带完整堆栈和服务器绝对路径的错误页，现在只返回简短说明，细节写服务端日志。
+
+Dependency security fixes (Socket.IO / express / multer and transitive deps, including an unauthenticated Socket.IO denial of service) and no more stack traces in error responses. All users should upgrade.
+
+（1.3.229 为内部构建调整，内容已包含在 1.3.228 的公开版本中。）
+
 ## 1.3.228 — 首次开源 / First public release
 
 myhi 此前在内部使用和迭代，这是第一个公开版本。主要功能：

@@ -3699,6 +3699,20 @@ app.get('/qr/:sessionId', checkAuth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// 统一错误处理（必须放在所有路由之后）：Express 默认错误页会把完整堆栈和服务器绝对路径回给客户端，
+// 畸形 JSON / 超限请求体不用登录就能触发 → 只回简短说明，细节记服务端日志
+// ---------------------------------------------------------------------------
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = Number(err?.status || err?.statusCode) || 500;
+  const msg = err?.type === 'entity.parse.failed' ? '请求格式不对'
+    : err?.type === 'entity.too.large' ? '请求内容太大'
+    : status < 500 ? (err?.expose && err?.message) || '请求有误' : '服务器内部错误';
+  if (status >= 500) console.error('[myhi] 请求处理出错', req.method, req.path, err?.stack || err);
+  res.status(status).json({ ok: false, error: msg });
+});
+
+// ---------------------------------------------------------------------------
 // Socket.IO auth middleware
 // ---------------------------------------------------------------------------
 
