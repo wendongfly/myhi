@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script>
+  // 首页 / 登录页绝不嵌在别的页面里显示（例如工作台右侧的会话页因会话不存在跳了过来）：换到顶层窗口打开
+  (function () { try { if (window.top !== window.self && window.top.location.origin === location.origin) window.top.location.replace(location.href); } catch (e) {} })();
+</script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <title>myhi</title>
+  <script src="/theme.js"></script>
+  <script>
+    // 主题：浏览器选过的优先，否则用服务端默认（新装浅色、老机器深色），与其他页面一致
+    (function(){try{var t=localStorage.getItem('myhi_theme')||window.MYHI_DEFAULT_THEME||'dark';
+      if(t==='system') t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+      if(t!=='dark') document.documentElement.setAttribute('data-theme',t);
+      var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content',t==='light'?'#ffffff':t==='black'?'#000000':'#0d1117');
+    }catch(e){}})();
+  </script>
+  <style>
+    :root { --bg:#0d1117; --surface:#161b22; --border:#21262d; --text:#e6edf3; --muted:#4a5568; --accent:#7c3aed; --accent2:#6d28d9; }
+    :root[data-theme="light"] { --bg:#ffffff; --surface:#f6f8fa; --border:#d0d7de; --text:#1f2328; --muted:#8c959f; --accent:#8250df; --accent2:#6f42c1; }
+    :root[data-theme="black"] { --bg:#000000; --surface:#0a0a0a; --border:#262626; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 340px;
+      padding: 2.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .logo {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .logo span { color: var(--accent); }
+
+    form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    input[type=password] {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      color: var(--text);
+      font-size: 1.1rem;
+      text-align: center;
+      letter-spacing: 0.2em;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    input[type=password]:focus { border-color: var(--accent); }
+    input[type=password]::placeholder { letter-spacing: normal; font-size: 0.9rem; color: var(--muted); }
+
+    button {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.85rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      -webkit-appearance: none;
+    }
+    button:active { background: var(--accent2); }
+    button:disabled { background: #4a5568; cursor: not-allowed; }
+
+    .error {
+      font-size: 0.82rem;
+      color: #f85149;
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    .occupied {
+      font-size: 0.9rem;
+      color: #f0883e;
+      text-align: center;
+      line-height: 1.6;
+      padding: 0.8rem;
+      background: rgba(240, 136, 62, 0.1);
+      border-radius: 10px;
+      display: none;
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">my<span>hi</span></div>
+
+    <div class="occupied" id="occupied"></div>
+
+    <form method="POST" action="/login">
+      <input type="password" name="password" placeholder="输入密码" autofocus autocomplete="current-password">
+      <div class="error" id="err"></div>
+      <button type="submit" id="btn">进入</button>
+    </form>
+
+    <div class="hint">密码见服务器启动日志<br>或编辑 ~/.myhi/password</div>
+  </div>
+
+  <script>
+    const errType = new URLSearchParams(location.search).get('error');
+    const errUser = new URLSearchParams(location.search).get('user');
+    if (errType === 'locked') {
+      document.getElementById('err').textContent = '登录尝试过多，请 5 分钟后重试';
+    } else if (errType === 'occupied' && errUser) {
+      document.getElementById('err').textContent = errUser + ' 正在使用中，同账号可直接登录，不同账号请让对方退出';
+    } else if (errType) {
+      document.getElementById('err').textContent = '密码错误，请重试';
+    }
+    document.querySelector('input').focus();
+
+    // 轮询登录状态（独占模式）
+    const occupiedEl = document.getElementById('occupied');
+    const btnEl = document.getElementById('btn');
+    const inputEl = document.querySelector('input[type=password]');
+
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (data.occupied) {
+          occupiedEl.textContent = data.userName + ' 正在使用中' + (data.releasing ? '\n对方已离线，即将自动释放…' : '\n同账号可直接登录');
+          occupiedEl.style.display = 'block';
+        } else if (data.onlineUsers && data.onlineUsers.length > 0) {
+          occupiedEl.textContent = '当前在线: ' + data.onlineUsers.join(', ');
+          occupiedEl.style.display = 'block';
+        } else {
+          occupiedEl.style.display = 'none';
+        }
+      } catch {}
+    }
+
+    checkStatus();
+    setInterval(checkStatus, 3000);
+  </script>
+</body>
+</html>

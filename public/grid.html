@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <title>myhi</title>
+  <script src="/lib/machine.js"></script>
+  <script src="/lib/icons.js"></script>
+  <script src="/sio-client/socket.io.min.js"></script>
+  <script src="/theme.js"></script>
+  <script>
+    (function(){try{
+      var t=localStorage.getItem('myhi_theme')||window.MYHI_DEFAULT_THEME||'dark';
+      var f=localStorage.getItem('myhi_font')||'medium';
+      var r=document.documentElement;
+      if(t&&t!=='dark') r.setAttribute('data-theme',t);
+      r.setAttribute('data-font',f);
+    }catch(e){}})();
+  </script>
+  <style>
+    :root {
+      --bg:#0d1117; --surface:#161b22; --surface2:#21262d; --border:#30363d;
+      --text:#e6edf3; --text2:#c9d1d9; --muted:#8b949e; --dim:#6e7681;
+      --blue:#58a6ff; --blue2:#1f6feb; --green:#3fb950; --red:#f85149; --purple:#7c3aed;
+    }
+    :root[data-theme="light"] { --bg:#ffffff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de;
+      --text:#1f2328; --text2:#32383f; --muted:#656d76; --dim:#818b98;
+      --blue:#0969da; --blue2:#0969da; --green:#1a7f37; --red:#cf222e; --purple:#8250df; }
+    :root[data-theme="black"] { --bg:#000000; --surface:#0a0a0a; --surface2:#161616; --border:#262626; }
+    @media (prefers-color-scheme: light) { :root[data-theme="system"] { --bg:#ffffff; --surface:#f6f8fa; --surface2:#eaeef2; --border:#d0d7de;
+      --text:#1f2328; --text2:#32383f; --muted:#656d76; --dim:#818b98;
+      --blue:#0969da; --blue2:#0969da; --green:#1a7f37; --red:#cf222e; --purple:#8250df; } }
+    html { font-size:16px; } html[data-font="small"]{font-size:15px;} html[data-font="large"]{font-size:17px;}
+    * { box-sizing:border-box; }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; }
+    body { display:flex; flex-direction:column; overflow:hidden; }
+    #bar { flex-shrink:0; display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0.6rem; background:var(--surface); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .logo { font-weight:700; font-size:0.95rem; color:var(--text); } .logo span{ color:var(--blue); }
+    .bar-btn { background:var(--bg); border:1px solid var(--border); color:var(--text2); font-size:0.78rem; padding:0.32rem 0.6rem; border-radius:7px; cursor:pointer; white-space:nowrap; }
+    .bar-btn:hover { border-color:var(--blue2); }
+    .seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .seg button { background:var(--bg); border:none; border-left:1px solid var(--border); color:var(--muted); font-size:0.76rem; padding:0.32rem 0.6rem; cursor:pointer; white-space:nowrap; }
+    .seg button:first-child { border-left:none; }
+    .seg button.active { background:var(--purple); color:#fff; }
+    .spacer { flex:1; }
+    #grid { flex:1; min-height:0; display:grid; gap:6px; padding:6px; overflow:auto; }
+    .pane { display:flex; flex-direction:column; min-height:260px; min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    .pane-head { flex-shrink:0; display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.4rem; background:var(--surface2); border-bottom:1px solid var(--border); }
+    .pane-head select { flex:1; min-width:0; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.28rem 0.4rem; font-size:0.78rem; }
+    .pane-head .pane-picker { flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:0.3rem; text-align:left; }
+    #tp-list [data-id]:hover { background:var(--surface2) !important; }
+    /* 窗格状态灯 */
+    .pane-dot { width:9px; height:9px; border-radius:50%; background:var(--dim); flex-shrink:0; }
+    .pane-dot.pulse { animation:panepulse 1.1s ease-in-out infinite; }
+    @keyframes panepulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .pane-head.flash { animation:paneflash 1s ease-in-out 3; }
+    @keyframes paneflash { 0%,100%{background:var(--surface2)} 50%{background:var(--blue2)} }
+    .pane-head button { background:var(--bg); border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:0.2rem 0.45rem; font-size:0.8rem; cursor:pointer; line-height:1; }
+    .pane-head button:hover { color:var(--text); border-color:var(--blue2); }
+    .pane-body { flex:1; min-height:0; position:relative; }
+    .pane-body iframe { width:100%; height:100%; border:none; display:block; background:var(--bg); }
+    .pane-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:0.82rem; text-align:center; padding:1rem; }
+    #empty-hint { flex:1; display:flex; align-items:center; justify-content:center; color:var(--dim); font-size:0.9rem; text-align:center; padding:2rem; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <div class="logo">my<span>hi</span> 分屏</div>
+    <button class="bar-btn" onclick="location.href='/'">← 首页</button>
+    <div class="seg" id="seg-layout">
+      <button data-lo="auto">自动</button>
+      <button data-lo="1">单屏</button>
+      <button data-lo="2">左右2</button>
+      <button data-lo="4">田字4</button>
+      <button data-lo="3">3列</button>
+    </div>
+    <span class="spacer"></span>
+    <button class="bar-btn" id="notify-btn" onclick="toggleNotify()" title="任务完成/待回答时桌面通知+提示音（默认关）">🔔 关</button>
+    <button class="bar-btn" onclick="refreshSessions(true)" title="刷新任务列表">↻</button>
+    <button class="bar-btn" onclick="addPane('')" title="加一个空窗格，从下拉选已有任务">＋ 窗格</button>
+    <button class="bar-btn" style="border-color:var(--green);color:var(--green)" onclick="openNewTask()" title="新建任务（和首页一致：预设/名称/命令/目录）">🆕 新建任务</button>
+  </div>
+  <div id="grid"></div>
+  <div id="empty-hint" style="display:none">点「＋ 窗格」或「🆕 新建任务」把多个任务并排看。<br>拉宽窗口自动多几格，或用上方按钮锁定布局。</div>
+
+  <!-- 任务选择弹窗（搜索 + 分组 + 标签）-->
+  <div id="task-picker" style="display:none;position:fixed;inset:0;z-index:100">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.5)" onclick="closeTaskPicker()"></div>
+    <div style="position:relative;max-width:540px;width:92%;margin:6vh auto 0;background:var(--surface);border:1px solid var(--border);border-radius:12px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,0.45)">
+      <div style="padding:0.6rem 0.8rem;border-bottom:1px solid var(--border);display:flex;gap:0.5rem;align-items:center">
+        <input id="tp-search" placeholder="搜索任务（名称 / 目录 / 标签）…" autocomplete="off" style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:0.42rem 0.6rem;font-size:0.82rem">
+        <button onclick="closeTaskPicker()" style="background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:0.38rem 0.6rem;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:0.45rem 0.8rem;display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)">
+        <div class="seg" id="tp-group">
+          <button data-g="time">最近</button><button data-g="project">项目</button><button data-g="tag">标签</button>
+        </div>
+        <span id="tp-tagbar" style="display:none;gap:0.3rem;flex-wrap:wrap;align-items:center"></span>
+      </div>
+      <div id="tp-list" style="flex:1;overflow-y:auto;padding:0.4rem 0.6rem"></div>
+    </div>
+  </div>
+
+  <!-- 新建任务面板（和首页「新建终端会话」一致）-->
+  <div id="new-task" style="display:none;position:fixed;inset:0;z-index:100">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.5)" onclick="closeNewTask()"></div>
+    <div style="position:relative;max-width:460px;width:92%;margin:8vh auto 0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;box-shadow:0 16px 48px rgba(0,0,0,0.45)">
+      <div style="font-weight:600;margin-bottom:0.7rem">新建任务</div>
+      <div id="nt-presets" style="display:flex;gap:0.4rem;margin-bottom:0.7rem;flex-wrap:wrap"></div>
+      <label style="font-size:0.72rem;color:var(--muted)">名称 <span style="color:var(--red)">必填</span></label>
+      <input id="nt-title" placeholder="请输入任务名称" autocomplete="off" style="width:100%;box-sizing:border-box;margin:0.2rem 0 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:0.45rem 0.6rem;font-size:0.85rem">
+      <label style="font-size:0.72rem;color:var(--muted)">启动命令（可选，终端类型用）</label>
+      <input id="nt-cmd" placeholder="留空仅打开 shell" autocomplete="off" style="width:100%;box-sizing:border-box;margin:0.2rem 0 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:0.45rem 0.6rem;font-size:0.82rem;font-family:monospace">
+      <label style="font-size:0.72rem;color:var(--muted)">工作目录（可选）</label>
+      <input id="nt-cwd" placeholder="留空 → 建在 默认目录/任务名 下（每个任务独立目录）" autocomplete="off" style="width:100%;box-sizing:border-box;margin:0.2rem 0 0.4rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:0.45rem 0.6rem;font-size:0.82rem">
+      <div id="nt-recent" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.7rem"></div>
+      <div style="display:flex;gap:0.5rem">
+        <button onclick="closeNewTask()" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:0.5rem;cursor:pointer">取消</button>
+        <button onclick="submitNewTask()" style="flex:2;background:var(--green);border:none;color:#fff;border-radius:8px;padding:0.5rem;cursor:pointer;font-weight:600">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const LS_KEY = 'myhi_grid_v1';
+    const gridEl = document.getElementById('grid');
+    const emptyHint = document.getElementById('empty-hint');
+    let sessions = [];          // [{id,title,cwd}]
+    let state = loadState();    // { layout, panes:[sessionId,...] }
+    const paneEls = [];         // 与可见窗格一一对应的 DOM（保序，保留 iframe 不重载）
+
+    function loadState() {
+      try { const s = JSON.parse(localStorage.getItem(LS_KEY)); if (s && Array.isArray(s.panes)) return { layout: s.layout || 'auto', panes: s.panes }; } catch {}
+      return { layout: 'auto', panes: [] };
+    }
+    function saveState() {
+      // 存【稳定标识】而不是易变 id——myhi 会话 id 每次重启都重新 randomUUID，存 id 重启后必失效
+      state.panes = paneEls.map(p => p._key || null);
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+    }
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function sName(s){ return s.title || s.name || s.summary || (s.id||s.sessionId||'').slice(0,12) || '未命名'; }
+    function sId(s){ return s.id || s.sessionId; }
+    function sessById(id){ return sessions.find(s => sId(s) === id); }
+    // 稳定标识：claudeSessionId(agent 会话，--resume 用，重启不变) / createdAt(持久化，稳定)
+    function keyOf(s){ return s ? { cid: s.claudeSessionId || null, createdAt: s.createdAt || null, cwd: s.cwd || null } : null; }
+    // 把稳定标识映射回【当前】会话 id（重启后 id 变了也能找回同一个会话）；找不到返回 ''
+    function resolveKey(key){
+      if (!key) return '';
+      if (typeof key === 'string') return sessById(key) ? key : ''; // 兼容旧格式(曾直接存 id)
+      for (const s of sessions) if (key.cid && s.claudeSessionId && s.claudeSessionId === key.cid) return sId(s);
+      for (const s of sessions) if (key.createdAt && s.createdAt === key.createdAt && (!key.cwd || s.cwd === key.cwd)) return sId(s);
+      return '';
+    }
+
+    // ── 布局 ──
+    function applyLayout() {
+      const lo = state.layout;
+      let cols;
+      if (lo === 'auto') cols = 'repeat(auto-fit, minmax(min(100%, 460px), 1fr))';
+      else if (lo === '1') cols = '1fr';
+      else if (lo === '3') cols = 'repeat(3, 1fr)';
+      else cols = 'repeat(2, 1fr)'; // '2' 左右 / '4' 田字 都是 2 列，行数由窗格数决定
+      gridEl.style.gridTemplateColumns = cols;
+      document.querySelectorAll('#seg-layout button').forEach(b => b.classList.toggle('active', b.dataset.lo === lo));
+      emptyHint.style.display = paneEls.length ? 'none' : '';
+      gridEl.style.display = paneEls.length ? 'grid' : 'none';
+    }
+    document.querySelectorAll('#seg-layout button').forEach(b => b.addEventListener('click', () => {
+      state.layout = b.dataset.lo;
+      // 田字：不足 4 格时自动补足空格，凑成 2×2 观感
+      if (b.dataset.lo === '4') { while (paneEls.length < 4) addPane('', true); }
+      saveState(); applyLayout();
+    }));
+
+    // ── 窗格 ──
+    function updatePickerLabel(pane) {
+      const s = pane._sid ? sessById(pane._sid) : null;
+      pane._picker.innerHTML = s
+        ? `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sName(s))}</span><span style="color:var(--dim);flex-shrink:0">▾</span>`
+        : `<span style="color:var(--muted)">＋ 选择任务</span><span style="color:var(--dim);flex-shrink:0">▾</span>`;
+    }
+    function addPane(sid, skipSave) {
+      const pane = document.createElement('div'); pane.className = 'pane'; pane._sid = sid || '';
+      const head = document.createElement('div'); head.className = 'pane-head';
+      const dot = document.createElement('span'); dot.className = 'pane-dot'; dot.title = '任务状态';
+      const picker = document.createElement('button'); picker.className = 'pane-picker';
+      const files = document.createElement('button'); files.textContent='📁'; files.title='查看该任务的文件（在本格内浏览/下载，远程也能用）';
+      files.addEventListener('click', () => {
+        if (pane._iframe && pane._iframe.contentWindow) pane._iframe.contentWindow.postMessage({ type:'myhi-cmd', cmd:'open-files' }, '*');
+        else alert('先给这个格子选一个任务');
+      });
+      const full = document.createElement('button'); full.textContent='↗'; full.title='在新标签页打开';
+      const close = document.createElement('button'); close.textContent='✕'; close.title='关闭此格'; close.style.color='var(--red)';
+      head.appendChild(dot); head.appendChild(picker); head.appendChild(files); head.appendChild(full); head.appendChild(close);
+      pane._dot = dot; pane._head = head;
+      const body = document.createElement('div'); body.className = 'pane-body';
+      const empty = document.createElement('div'); empty.className='pane-empty'; empty.textContent='点上方「选择任务」挑一个（可搜索/分组/按标签）'; body.appendChild(empty);
+      pane.appendChild(head); pane.appendChild(body);
+      pane._picker = picker; pane._body = body; pane._empty = empty; pane._iframe = null;
+
+      picker.addEventListener('click', () => openTaskPicker(pane));
+      full.addEventListener('click', () => { if (pane._sid) window.open('/terminal/' + pane._sid, '_blank'); });
+      close.addEventListener('click', () => removePane(pane));
+
+      gridEl.appendChild(pane);
+      paneEls.push(pane);
+      updatePickerLabel(pane);
+      if (sid) setPaneSession(pane, sid);
+      if (!skipSave) { saveState(); }
+      applyLayout();
+    }
+    function setPaneSession(pane, sid) {
+      pane._sid = sid || '';
+      pane._key = sid ? keyOf(sessById(sid)) : null; // 记住稳定标识，供重启后找回
+      updatePickerLabel(pane);
+      // 只重建这一格的 iframe，其它格不受影响
+      if (pane._iframe) { pane._iframe.remove(); pane._iframe = null; }
+      if (sid) {
+        pane._empty.style.display = 'none';
+        const ifr = document.createElement('iframe');
+        ifr.src = '/terminal/' + encodeURIComponent(sid) + '?embed=1';
+        pane._body.appendChild(ifr); pane._iframe = ifr;
+      } else {
+        pane._empty.style.display = '';
+      }
+      saveState();
+    }
+    function removePane(pane) {
+      const i = paneEls.indexOf(pane); if (i >= 0) paneEls.splice(i, 1);
+      pane.remove(); saveState(); applyLayout();
+    }
+
+    // ── 任务列表 ──
+    async function refreshSessions(rebuild) {
+      try {
+        const r = await fetch('/api/sessions'); if (!r.ok) return;
+        const data = await r.json();
+        sessions = (Array.isArray(data) ? data : (data.sessions || [])).filter(s => sId(s));
+      } catch {}
+      if (rebuild) for (const pane of paneEls) updatePickerLabel(pane);
+    }
+
+    // ── 任务选择弹窗（搜索 + 最近/项目/标签分组 + 标签过滤，借鉴首页）──
+    let _pickTarget = null;
+    let _tpGroup = localStorage.getItem('myhi_grid_group') || 'time';
+    let _tpTag = null;
+    function sessionTime(s){ return s.lastActivityAt || s.createdAt || 0; }
+    // 与首页卡片同款相对时间（1.3.173：任务选择条目信息量对齐首页）
+    function fmtRelTime(ms) {
+      if (!ms) return '';
+      const diff = Date.now() - ms;
+      if (diff < 60000) return '刚刚';
+      if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+      const d = new Date(ms);
+      const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (diff < 172800000) return '昨天 ' + hm;
+      return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    }
+    // 待发草稿数（角标），打开弹窗时拉一次
+    let _draftCounts = {};
+    function refreshDraftCounts() {
+      return fetch('/api/inbox').then(r => r.json()).then(d => { _draftCounts = d.counts || {}; }).catch(() => {});
+    }
+    window.openTaskPicker = function(pane) {
+      _pickTarget = pane;
+      document.getElementById('task-picker').style.display = '';
+      document.getElementById('tp-search').value = '';
+      refreshDraftCounts();
+      refreshSessions(false).then(renderPicker);
+      renderPicker();
+      setTimeout(() => document.getElementById('tp-search').focus(), 30);
+    };
+    window.closeTaskPicker = function(){ document.getElementById('task-picker').style.display='none'; _pickTarget=null; };
+    function pushMap(m,k,v){ if(!m.has(k)) m.set(k,[]); m.get(k).push(v); }
+    function renderPicker() {
+      document.querySelectorAll('#tp-group button').forEach(b => b.classList.toggle('active', b.dataset.g === _tpGroup));
+      const tagbar = document.getElementById('tp-tagbar');
+      if (_tpGroup === 'tag') {
+        const allTags = [...new Set(sessions.flatMap(s => s.tags || []))].sort();
+        const chip = (label,val,on) => `<button data-tag="${val==null?'':esc(val)}" style="border:1px solid ${on?'var(--blue2)':'var(--border)'};background:${on?'var(--blue2)':'var(--bg)'};color:${on?'#fff':'var(--muted)'};border-radius:999px;font-size:0.7rem;padding:0.12rem 0.5rem;cursor:pointer">${esc(label)}</button>`;
+        tagbar.innerHTML = chip('全部',null,!_tpTag) + allTags.map(t=>chip(t,t,_tpTag===t)).join('');
+        tagbar.style.display = 'flex';
+      } else { tagbar.style.display='none'; }
+
+      const kw = (document.getElementById('tp-search').value||'').trim().toLowerCase();
+      let items = sessions.filter(s => !kw || sName(s).toLowerCase().includes(kw) || (s.cwd||'').toLowerCase().includes(kw) || (s.tags||[]).join(' ').toLowerCase().includes(kw));
+      items.sort((a,b)=>sessionTime(b)-sessionTime(a));
+      const itemHtml = (s) => {
+        const cur = _pickTarget && _pickTarget._sid === sId(s);
+        const tags = (s.tags||[]).map(t=>`<span style="background:var(--surface2);color:var(--muted);border-radius:4px;font-size:0.62rem;padding:0.02rem 0.3rem">${esc(t)}</span>`).join(' ');
+        // 与首页卡片同款信息：时间/在线/控制中 + 首条消息 + 待发草稿 + 存活状态点
+        const meta = [fmtRelTime(sessionTime(s)), s.viewers > 0 ? `${s.viewers} 在线` : '', s.controlHolderName ? `${s.controlHolderName} 控制中` : ''].filter(Boolean).join(' · ');
+        const gist = s.firstUserText ? `<div style="font-size:0.66rem;color:var(--muted);margin-top:0.12rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">💬 ${esc(s.firstUserText)}</div>` : '';
+        const nDraft = _draftCounts[sId(s)] || 0;
+        const draft = nDraft ? `<div style="font-size:0.64rem;color:#d29922;margin-top:0.1rem">📥 ${nDraft} 条待发草稿</div>` : '';
+        return `<div data-id="${esc(sId(s))}" style="display:flex;align-items:center;gap:0.5rem;padding:0.45rem 0.5rem;border-radius:7px;cursor:pointer;border:1px solid ${cur?'var(--blue2)':'transparent'};background:${cur?'var(--surface2)':'transparent'}">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:0.82rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sName(s))} ${tags}</div>
+            <div style="font-size:0.66rem;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.cwd||'（无目录）')}${meta ? ' · ' + esc(meta) : ''}</div>
+            ${gist}
+            ${draft}
+          </div>
+          <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:0.2rem">
+            <span title="${s.alive ? '存活' : '已结束'}" style="width:8px;height:8px;border-radius:50%;background:${s.alive?'var(--green,#2ea043)':'var(--red,#f85149)'};box-shadow:${s.alive?'0 0 5px var(--green,#2ea043)':'none'}"></span>
+            ${s.viewers > 1 ? `<span style="font-size:0.6rem;color:var(--dim)">👁 ${s.viewers}</span>` : ''}
+          </div>
+        </div>`;
+      };
+      const header = (t) => `<div style="color:var(--muted);font-size:0.7rem;font-weight:600;margin:0.6rem 0.2rem 0.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t)}</div>`;
+      let html = '';
+      if (_tpGroup === 'project') {
+        const groups = new Map();
+        for (const s of items) pushMap(groups, s.cwd || '（无目录）', s);
+        const ordered = [...groups.entries()].sort((a,b)=>sessionTime(b[1][0])-sessionTime(a[1][0]));
+        for (const [k,arr] of ordered) html += header(k) + arr.map(itemHtml).join('');
+      } else if (_tpGroup === 'tag') {
+        if (_tpTag) { html += items.filter(s => (s.tags||[]).includes(_tpTag)).map(itemHtml).join(''); }
+        else {
+          const tagged = new Map(); const untagged = [];
+          for (const s of items) { const ts=s.tags||[]; if(!ts.length) untagged.push(s); for(const t of ts) pushMap(tagged,t,s); }
+          const ordered=[...tagged.entries()].sort((a,b)=>sessionTime(b[1][0])-sessionTime(a[1][0]));
+          for (const [t,arr] of ordered) html += header('# '+t) + arr.map(itemHtml).join('');
+          if (untagged.length) html += header('无标签') + untagged.map(itemHtml).join('');
+        }
+      } else { html = items.map(itemHtml).join(''); }
+      document.getElementById('tp-list').innerHTML = html || '<div style="color:var(--muted);text-align:center;padding:1.5rem 0;font-size:0.8rem">没有匹配的任务</div>';
+    }
+    // 事件委托：选任务 / 选标签 / 切分组 / 搜索
+    document.getElementById('tp-list').addEventListener('click', (e) => {
+      const el = e.target.closest('[data-id]'); if (!el) return;
+      if (_pickTarget) setPaneSession(_pickTarget, el.dataset.id);
+      closeTaskPicker();
+    });
+    document.getElementById('tp-tagbar').addEventListener('click', (e) => {
+      const el = e.target.closest('[data-tag]'); if (!el) return;
+      _tpTag = el.dataset.tag || null; renderPicker();
+    });
+    document.querySelectorAll('#tp-group button').forEach(b => b.addEventListener('click', () => {
+      _tpGroup = b.dataset.g; _tpTag = null; localStorage.setItem('myhi_grid_group', _tpGroup); renderPicker();
+    }));
+    document.getElementById('tp-search').addEventListener('input', renderPicker);
+
+    // ── 新建任务（和首页「新建终端会话」一致：预设 + 名称 + 命令 + 目录 + 最近目录）──
+    const socket = io();
+    const NT_PRESETS = [
+      { icon:'🤖', label:'默认', title:'claude', type:'agent', cmd:'' },
+      { icon:'🐚', label:'Shell',  title:'shell',  type:'pty',   cmd:'' },
+    ];
+    let _ntPreset = 0;
+    const RECENT_DIRS_KEY = 'myhi_recent_dirs'; // 和首页共用
+    function ntRecentDirs(){ try { return JSON.parse(localStorage.getItem(RECENT_DIRS_KEY)) || {}; } catch { return {}; } }
+    function ntRecordDir(dir){ if(!dir) return; const d=ntRecentDirs(); d[dir]=(d[dir]||0)+1; const s=Object.entries(d).sort((a,b)=>b[1]-a[1]).slice(0,5); localStorage.setItem(RECENT_DIRS_KEY, JSON.stringify(Object.fromEntries(s))); }
+    function ntRenderPresets(){
+      document.getElementById('nt-presets').innerHTML = NT_PRESETS.map((p,i)=>`<button data-i="${i}" style="flex:1;min-width:5rem;display:flex;align-items:center;justify-content:center;gap:0.3rem;border:1px solid ${i===_ntPreset?'var(--blue2)':'var(--border)'};background:${i===_ntPreset?'var(--blue2)':'var(--bg)'};color:${i===_ntPreset?'#fff':'var(--text2)'};border-radius:8px;padding:0.4rem;font-size:0.8rem;cursor:pointer">${p.icon} ${esc(p.label)}</button>`).join('');
+    }
+    function ntRenderRecent(){
+      const dirs = Object.entries(ntRecentDirs()).sort((a,b)=>b[1]-a[1]);
+      document.getElementById('nt-recent').innerHTML = dirs.map(([p])=>`<button data-dir="${esc(p)}" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:6px;font-size:0.68rem;padding:0.12rem 0.4rem;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p)}</button>`).join('');
+    }
+    window.openNewTask = function(){
+      _ntPreset = 0;
+      document.getElementById('new-task').style.display = '';
+      document.getElementById('nt-title').value = '';
+      document.getElementById('nt-cmd').value = '';
+      document.getElementById('nt-cwd').value = '';
+      ntRenderPresets(); ntRenderRecent();
+      setTimeout(()=>document.getElementById('nt-title').focus(), 30);
+    };
+    window.closeNewTask = function(){ document.getElementById('new-task').style.display='none'; };
+    window.submitNewTask = function(){
+      const title = document.getElementById('nt-title').value.trim();
+      if (!title) { document.getElementById('nt-title').focus(); return; }
+      const cmd = document.getElementById('nt-cmd').value.trim() || undefined;
+      const cwd = document.getElementById('nt-cwd').value.trim() || undefined;
+      if (cwd) ntRecordDir(cwd);
+      const preset = NT_PRESETS[_ntPreset];
+      const done = (res) => {
+        if (res && res.ok && res.session) { closeNewTask(); refreshSessions(true).then(()=>addPane(res.session.id)); }
+        else alert('创建失败：' + ((res && res.error) || '未知错误'));
+      };
+      // 工作目录留空时：让服务端按任务名建在「默认目录/任务名」下，避免多任务全堆在同一默认目录
+      const nestByTitle = !cwd;
+      if (preset.type === 'agent') socket.emit('create-agent', { title, cwd, nestByTitle }, done);
+      else socket.emit('create', { title, initCmd: cmd, cwd, nestByTitle }, done);
+    };
+    document.getElementById('nt-presets').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-i]'); if (!b) return;
+      _ntPreset = +b.dataset.i; const p = NT_PRESETS[_ntPreset];
+      const t = document.getElementById('nt-title');
+      if (!t.value.trim() || NT_PRESETS.some(x => x.title === t.value.trim())) t.value = p.title;
+      document.getElementById('nt-cmd').value = p.cmd || '';
+      ntRenderPresets();
+    });
+    document.getElementById('nt-recent').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-dir]'); if (!b) return;
+      document.getElementById('nt-cwd').value = b.dataset.dir;
+    });
+
+    // ── 窗格状态灯 + 完成/待回答高亮 + 通知（内嵌会话页 postMessage 上报）──
+    let _notify = localStorage.getItem('myhi_grid_notify') === '1';
+    function syncNotifyBtn(){ const b=document.getElementById('notify-btn'); if(b) b.textContent='🔔 '+(_notify?'开':'关'); }
+    window.toggleNotify = function(){
+      _notify = !_notify;
+      if (_notify && 'Notification' in window && Notification.permission==='default') Notification.requestPermission();
+      localStorage.setItem('myhi_grid_notify', _notify?'1':'0');
+      syncNotifyBtn();
+    };
+    syncNotifyBtn();
+    function paneTitle(pane){ const s = pane._sid ? sessById(pane._sid) : null; return s ? sName(s) : '任务'; }
+    function beep(){ try { const c=new (window.AudioContext||window.webkitAudioContext)(); const o=c.createOscillator(), g=c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value=660; g.gain.value=0.06; o.start(); setTimeout(()=>{o.stop();c.close();},180);} catch {} }
+    function fireNotify(pane,label){
+      if(!_notify) return;
+      try { if('Notification' in window && Notification.permission==='granted') new Notification((localStorage.getItem('myhi_machine_name')||'myhi')+' · '+label,{body:paneTitle(pane)}); } catch {}
+      beep();
+    }
+    function setPaneStatus(pane,state){
+      const prev=pane._state; pane._state=state;
+      if(pane._dot){
+        const c={idle:'var(--green)',working:'var(--blue)',thinking:'var(--blue)',waiting:'#d29922'}[state]||'var(--dim)';
+        pane._dot.style.background=c;
+        pane._dot.classList.toggle('pulse', state==='working'||state==='thinking');
+        pane._dot.title={idle:'空闲/已完成',working:'执行中',thinking:'执行中',waiting:'等你回答'}[state]||'状态';
+      }
+      const justDone=(prev==='working'||prev==='thinking')&&state==='idle';
+      if(justDone||state==='waiting'){
+        if(pane._head){ pane._head.classList.remove('flash'); void pane._head.offsetWidth; pane._head.classList.add('flash'); setTimeout(()=>pane._head&&pane._head.classList.remove('flash'),3200); }
+        fireNotify(pane, state==='waiting'?'待回答':'已完成');
+      }
+    }
+    window.addEventListener('message',(e)=>{
+      const m=e.data;
+      if(!m||m.type!=='myhi-status') return;
+      const pane=paneEls.find(p=>p._sid&&p._sid===m.sessionId);
+      if(pane) setPaneStatus(pane,m.state);
+    });
+
+    // ── 初始化 ──
+    (async function init() {
+      await refreshSessions(false);
+      const initial = (state.panes && state.panes.length) ? state.panes : [];
+      // 用稳定标识映射回当前 id；找不到→空格(可下拉重选)，不再加载死会话报「未找到」
+      for (const key of initial) addPane(resolveKey(key), true);
+      applyLayout();
+    })();
+  </script>
+</body>
+</html>

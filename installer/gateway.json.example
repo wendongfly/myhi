@@ -1,0 +1,6 @@
+{
+  "_说明": "AI 大模型网关配置模板。批量部署时：复制本文件为 gateway.json、填入真实 baseUrl/apiKey，放在 installer 文件夹里，安装器会自动部署到每台机器的 ~/.myhi/gateway.json，AI 开箱即用。",
+  "_安全": "gateway.json 含密钥，已被 .gitignore 忽略、绝不进 git；只在你的部署包/本机之间流转。",
+  "baseUrl": "https://你的AI网关地址",
+  "apiKey": "sk-你的密钥"
+}

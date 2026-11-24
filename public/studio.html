@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <title>出图 · myhi</title>
+  <script src="/theme.js"></script>
+  <script src="/lib/machine.js"></script>
+  <script src="/lib/icons.js"></script>
+  <script>
+    (function(){try{var t=localStorage.getItem('myhi_theme')||window.MYHI_DEFAULT_THEME||'dark',f=localStorage.getItem('myhi_font')||'medium',r=document.documentElement;if(t&&t!=='dark')r.setAttribute('data-theme',t);r.setAttribute('data-font',f);}catch(e){}})();
+  </script>
+  <style>
+    :root {
+      --bg:#0d1117; --surface:#161b22; --surface2:#1c2128; --border:#21262d; --border2:#30363d;
+      --text:#e6edf3; --text2:#b1bac4; --muted:#8b949e; --dim:#6e7681;
+      --accent:#7c3aed; --accent2:#9d5cf5; --red:#f85149; --redbg:#3d1515;
+      --green:#3fb950; --yellow:#d29922; --orange:#f0883e; --blue:#58a6ff;
+    }
+    :root[data-theme="light"] { --bg:#ffffff; --surface:#f6f8fa; --surface2:#eef1f4; --border:#d0d7de; --border2:#d0d7de;
+      --text:#1f2328; --text2:#57606a; --muted:#656d76; --dim:#818b98;
+      --accent:#8250df; --accent2:#8250df; --red:#cf222e; --redbg:#ffebe9;
+      --green:#1a7f37; --yellow:#9a6700; --orange:#bc4c00; --blue:#0969da; }
+    :root[data-theme="black"] { --bg:#000000; --surface:#0a0a0a; --surface2:#111; --border:#161616; --border2:#262626; }
+    @media (prefers-color-scheme: light) { :root[data-theme="system"] { --bg:#ffffff; --surface:#f6f8fa; --surface2:#eef1f4; --border:#d0d7de; --border2:#d0d7de;
+      --text:#1f2328; --text2:#57606a; --muted:#656d76; --dim:#818b98;
+      --accent:#8250df; --accent2:#8250df; --red:#cf222e; --redbg:#ffebe9;
+      --green:#1a7f37; --yellow:#9a6700; --orange:#bc4c00; --blue:#0969da; } }
+    html { font-size: 16px; } html[data-font="small"]{font-size:15px;} html[data-font="medium"]{font-size:17px;} html[data-font="large"]{font-size:19.5px;}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 0.85rem; line-height: 1.55; }
+    a { color: var(--blue); text-decoration: none; }
+    #hd { display: flex; align-items: center; gap: 0.6rem; padding: max(0.6rem, env(safe-area-inset-top)) 1rem 0.6rem; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 5; }
+    #hd .back { color: var(--muted); font-size: 0.85rem; }
+    html { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    ::-webkit-scrollbar-track { background: transparent; }
+    /* 嵌在首页工作台（?embed=ws）：页头去掉，左栏顶部放导航、底部「用户 + ⚙」（同任务栏），两栏铺满、各自滚动 */
+    .emb-only { display: none; }
+    body.embed .emb-only { display: block; }
+    body.embed { height: 100vh; overflow: hidden; }
+    body.embed #hd { display: none; }
+    body.embed #wrap { max-width: none; height: 100vh; padding: 0; gap: 0; grid-template-columns: 360px 1fr; }
+    body.embed #lcol { height: 100vh; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); min-width: 0; }
+    body.embed #emb-nav { flex-shrink: 0; padding: 0.75rem 0.75rem 0; }
+    body.embed #lscroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 0.75rem 1.2rem; scrollbar-width: thin; }
+    body.embed #emb-foot { display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.6rem 0.6rem 0.9rem; }
+    #emb-user { flex: 1; min-width: 0; font-size: 0.8rem; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #emb-set { background: none; border: none; color: var(--text2); font-size: 1.05rem; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; }
+    #emb-set:hover { background: var(--bg); color: var(--text); }
+    body.embed #wrap > div:first-child .card { background: var(--bg); padding: 0.8rem; }
+    body.embed #result { height: 100vh; overflow-y: auto; scrollbar-width: thin; border: none; border-radius: 0; background: var(--bg); padding: 1rem 1.4rem; }
+    #emb-nav .top { display: flex; align-items: center; margin: 0.05rem 0.2rem 0.6rem; }
+    #emb-nav .logo { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+    #emb-nav .logo span { color: var(--accent); }
+    #emb-nav .gear { margin-left: auto; background: none; border: none; color: var(--text2); font-size: 1rem; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
+    #emb-nav .gear:hover { background: var(--bg); color: var(--text); }
+    #emb-nav .nav3 { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0.75rem; }
+    #emb-nav .nav3 button { flex: 1; background: none; border: none; border-radius: 7px; color: var(--text2); font: inherit; font-size: 0.8rem; padding: 0.42rem 0.2rem; cursor: pointer; white-space: nowrap; }
+    #emb-nav .nav3 button:hover { color: var(--text); }
+    #emb-nav .nav3 button.on { background: var(--accent); color: #fff; font-weight: 600; }
+    #hd h1 { font-size: 1rem; font-weight: 600; }
+    #hd .quota { margin-left: auto; font-size: 0.75rem; color: var(--muted); }
+    #wrap { display: grid; grid-template-columns: 380px 1fr; gap: 1rem; padding: 1rem; max-width: 1400px; margin: 0 auto; align-items: start; }
+    @media (max-width: 860px) { #wrap { grid-template-columns: 1fr; padding: 0.75rem; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem; }
+    .card + .card { margin-top: 0.8rem; }
+    .lbl { display: block; font-weight: 600; margin: 0.7rem 0 0.3rem; font-size: 0.82rem; }
+    .lbl:first-child { margin-top: 0; }
+    .lbl small { font-weight: 400; color: var(--muted); margin-left: 0.3rem; }
+    textarea, input[type=text], select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border2); border-radius: 8px; padding: 0.5rem 0.6rem; font: inherit; outline: none; }
+    textarea:focus, input:focus, select:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 4.5em; }
+    .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+    .chip { border: 1px solid var(--border2); background: none; color: var(--text2); border-radius: 12px; padding: 0.1rem 0.55rem; font-size: 0.72rem; cursor: pointer; }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .seg { display: flex; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; }
+    .seg button { flex: 1; background: none; border: none; color: var(--text2); padding: 0.45rem 0; cursor: pointer; font: inherit; }
+    .seg button.on { background: var(--accent); color: #fff; }
+    .chk { display: flex; align-items: flex-start; gap: 0.45rem; margin-top: 0.7rem; cursor: pointer; }
+    .chk small { display: block; color: var(--muted); }
+    .go { width: 100%; margin-top: 0.9rem; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 0.7rem; font: inherit; font-weight: 600; font-size: 0.92rem; cursor: pointer; }
+    .go:disabled { opacity: 0.55; cursor: default; }
+    .hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.5rem; line-height: 1.6; }
+    .warn { color: var(--yellow); } .err { color: var(--red); }
+    .empty { color: var(--muted); text-align: center; padding: 2.5rem 1rem; }
+    #job-hd { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+    #job-hd b { font-size: 0.95rem; }
+    #job-hd .meta { color: var(--muted); font-size: 0.75rem; }
+    #job-hd .act { margin-left: auto; display: flex; gap: 0.4rem; }
+    .btn { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 0.3rem 0.65rem; font: inherit; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
+    .btn:hover { border-color: var(--accent); }
+    .btn.danger { color: var(--red); }
+    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.8rem; }
+    .slot { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+    .slot .pic { aspect-ratio: 1; background: var(--surface2); display: flex; align-items: center; justify-content: center; position: relative; }
+    .slot .pic img { width: 100%; height: 100%; object-fit: contain; cursor: zoom-in; }
+    .slot .pic .wait { color: var(--muted); font-size: 0.8rem; text-align: center; padding: 1rem; }
+    .badge { position: absolute; left: 0.5rem; top: 0.5rem; border-radius: 10px; padding: 0.1rem 0.55rem; font-size: 0.72rem; font-weight: 600; color: #fff; }
+    .b-pass { background: var(--green); } .b-review { background: var(--orange); } .b-fail { background: var(--red); } .b-run { background: var(--accent); } .b-unchecked { background: var(--dim); }
+    .slot .body { padding: 0.6rem 0.7rem; font-size: 0.75rem; }
+    .att { border-top: 1px dashed var(--border); padding: 0.4rem 0; }
+    .att:first-child { border-top: none; padding-top: 0; }
+    .att .t { font-weight: 600; color: var(--text2); }
+    .ok { color: var(--green); } .no { color: var(--red); }
+    .slot .acts { display: flex; gap: 0.35rem; padding: 0 0.7rem 0.7rem; flex-wrap: wrap; }
+    .thumbs { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
+    .thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 2px solid transparent; cursor: pointer; }
+    .thumbs img.on { border-color: var(--accent); }
+    #hist .h { display: flex; gap: 0.6rem; align-items: center; padding: 0.45rem 0.3rem; border-top: 1px solid var(--border); cursor: pointer; border-radius: 6px; }
+    #hist .h:first-child { border-top: none; }
+    #hist .h:hover, #hist .h.on { background: var(--surface2); }
+    #hist .h img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; background: var(--surface2); flex-shrink: 0; }
+    #hist .h .x { min-width: 0; flex: 1; }
+    #hist .h .x div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #hist .h .x small { color: var(--muted); }
+    /* 历史：每条右侧 🗑（悬停显示，触屏常显）；「管理」模式多选删除 / 清空 */
+    #hist .hsel { display: none; flex-shrink: 0; margin: 0; }
+    #hist.man .hsel { display: inline-block; }
+    #hist .hdel { flex-shrink: 0; opacity: 0; cursor: pointer; padding: 0.15rem 0.3rem; border-radius: 5px; color: var(--muted); font-size: 0.85rem; }
+    #hist .h:hover .hdel { opacity: 1; }
+    #hist .hdel:hover { background: var(--bg); color: var(--red); }
+    @media (hover: none) { #hist .hdel { opacity: 0.7; } }
+    #hist.man .hdel { display: none; }
+    #hist-bar { display: none; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin: 0.2rem 0 0.4rem; font-size: 0.75rem; }
+    #hist-bar button { background: none; border: 1px solid var(--border); color: var(--text2); border-radius: 6px; padding: 0.2rem 0.55rem; cursor: pointer; font: inherit; }
+    #hist-bar button.danger { color: var(--red); border-color: var(--red); }
+    #hist-bar button:disabled { opacity: 0.45; cursor: default; }
+    #zoom { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 50; align-items: center; justify-content: center; cursor: zoom-out; }
+    #zoom.on { display: flex; }
+    #zoom img { max-width: 94vw; max-height: 94vh; }
+    .ref { border: 1.5px dashed var(--border2); border-radius: 10px; padding: 0.6rem; text-align: center; cursor: pointer; color: var(--muted); font-size: 0.78rem; }
+    .ref:hover, .ref.drag { border-color: var(--accent); color: var(--text); }
+    .ref.has { display: flex; align-items: center; gap: 0.6rem; text-align: left; cursor: default; border-style: solid; }
+    .ref.has img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+    .ref .rm { margin-left: auto; background: none; border: none; color: var(--muted); font-size: 1rem; cursor: pointer; }
+    .seg.sm button { padding: 0.32rem 0; font-size: 0.75rem; }
+    .refbox { display: flex; gap: 0.7rem; align-items: flex-start; background: var(--surface2); border-radius: 10px; padding: 0.6rem; margin: 0.4rem 0 0.6rem; font-size: 0.75rem; }
+    .refbox img { width: 88px; height: 88px; object-fit: cover; border-radius: 8px; cursor: zoom-in; flex-shrink: 0; }
+    .refbox .d { white-space: pre-wrap; color: var(--text2); max-height: 9em; overflow-y: auto; }
+    details.pr { margin-top: 0.6rem; font-size: 0.75rem; color: var(--muted); }
+    details.pr pre { white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; margin-top: 0.3rem; color: var(--text2); font-family: inherit; }
+  </style>
+</head>
+<body>
+<script>if (new URLSearchParams(location.search).get('embed')) document.body.classList.add('embed');</script>
+  <div id="hd">
+    <a class="back" href="/">‹ myhi</a>
+    <h1 data-ico>🖼 出图</h1>
+    <span class="quota" id="quota"></span>
+  </div>
+  <div id="wrap">
+    <div id="lcol"><div id="emb-nav" class="emb-only">
+        <div class="top"><a class="logo" onclick="navTo('tasks')" style="cursor:pointer">my<span>hi</span></a></div>
+        <div class="nav3"><button data-ico onclick="navTo('tasks')">💬 任务</button><button data-ico class="on">🖼 出图</button><button data-ico onclick="navTo('voice')">🎤 语音</button></div>
+      </div><div id="lscroll">
+      <div class="card" id="form">
+        <label class="lbl" for="need">要一张什么样的图</label>
+        <textarea id="need" rows="4" placeholder="例如：双十一促销海报，红色喜庆背景，中间是一台笔记本电脑，突出「全场 5 折」"></textarea>
+        <label class="lbl" for="texts">图里必须出现的文字<small>每行一条，逐字核对；没有就留空</small></label>
+        <textarea id="texts" rows="3" placeholder="全场 5 折&#10;11 月 11 日"></textarea>
+        <div class="hint">文字越短越不容易出错。标注、说明请用文字写出来，看图模型认红框 / 箭头不准。</div>
+        <label class="lbl">参考图<small>可选：照着某张图来做，可粘贴截图</small></label>
+        <div class="ref" id="ref" onclick="if(!REF)$('ref-file').click()">点这里选一张参考图，或拖进来 / Ctrl+V 粘贴</div>
+        <input type="file" id="ref-file" accept="image/*" style="display:none">
+        <div class="seg sm" id="ref-mode" style="display:none;margin-top:0.4rem"><button data-m="style">模仿风格配色</button><button data-m="layout">模仿构图版式</button><button data-m="all" class="on">都照着做</button><button data-m="person" title="出图里的人物和参考图是同一个人（需要支持人像参考的模型，如 image-01）">保持人物样貌</button></div>
+        <div class="hint" id="ref-hint" style="display:none"></div>
+        <label class="lbl" for="style">风格 / 用途<small>可选</small></label>
+        <input type="text" id="style" placeholder="例如：扁平插画，朋友圈配图">
+        <div class="chips" id="style-chips"></div>
+        <div class="row2">
+          <div><label class="lbl" for="model">出图模型</label><select id="model"></select></div>
+          <div><label class="lbl" for="size">尺寸</label><select id="size"></select></div>
+        </div>
+        <div id="variant-row" style="display:none"><label class="lbl" for="variant">清晰度<small>档位越高越清楚，单价也越高</small></label><select id="variant"></select></div>
+        <div class="hint" id="model-hint"></div>
+        <label class="lbl">张数</label>
+        <div class="seg" id="n-seg"></div>
+        <label class="chk" id="refine-row"><input type="checkbox" id="refine" checked><span>先整理成出图提示词<small id="refine-hint">把业务描述改写成适合出图的描述，图更好看</small></span></label>
+        <label class="lbl" for="save-to">保存到项目<small>可选：出图后自动放进项目的「出图」文件夹</small></label>
+        <select id="save-to"><option value="">不保存（之后也可以手动保存）</option></select>
+        <button class="go" id="go" onclick="startJob()">开始出图</button>
+        <div class="hint" id="qc-hint"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;margin-bottom:0.3rem"><b>历史</b><a id="hist-man" style="margin-left:auto;font-size:0.75rem;cursor:pointer" onclick="histManage(!$('hist').classList.contains('man'))">管理</a><a style="margin-left:0.8rem;font-size:0.75rem;cursor:pointer" onclick="loadHistory()">刷新</a></div><div id="hist-bar"><button onclick="histSelAll()">全选</button><button id="hist-delsel" class="danger" onclick="histDelSel()" disabled>删除所选</button><button class="danger" style="margin-left:auto" onclick="histClear()">清空全部</button></div>
+        <div id="hist"><div class="empty" style="padding:1rem">还没有出过图</div></div>
+      </div>
+    </div>
+    <div id="emb-foot" class="emb-only"><span id="emb-user" data-ico>👤 本机</span><button id="emb-set" onclick="openMenu(event)" title="设置与更多">⚙</button></div></div>
+    <div class="card" id="result"><div class="empty">左边填好需求，点「开始出图」。<br>每张图会先出图，再做文字比对和看图复核，不合格自动重来（最多 3 次）。</div></div>
+  </div>
+  <div id="zoom" onclick="this.classList.remove('on')"><img alt=""></div>
+<script>
+  // 内联事件属性 onclick="f('${jsq(x)}')" 专用：先按 JS 单引号字符串转义，再按 HTML 属性转义。
+  // 只做 HTML 转义不够 —— 浏览器先把 &#39; 解码回 ' 再交给 JS，文件名 / 技能名里带 ' 就能跳出字符串执行代码
+  function jsq(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, '\\n').replace(/[\u2028\u2029]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  const $ = (id) => document.getElementById(id);
+  // 嵌在首页工作台时：左栏导航 / ⚙ 交给首页切换（同源 postMessage）；单独打开时就是普通链接
+  // 底部 ⚙：让首页在这个按钮上方弹出和任务栏同一个「设置与更多」菜单；在本页点别处 / Esc 就收起
+  window.openMenu = (e) => {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    if (window.parent !== window) window.parent.postMessage({ type: 'myhi-nav', to: 'menu', rect: { left: r.left, right: r.right, top: r.top, bottom: r.bottom } }, location.origin);
+  };
+  if (window.parent !== window) {
+    const closeMenu = () => window.parent.postMessage({ type: 'myhi-nav', to: 'menu-close' }, location.origin);
+    document.addEventListener('mousedown', (e) => { if (!e.target.closest('#emb-set')) closeMenu(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+    try { const u = window.parent.document.getElementById('ws-user')?.textContent.replace(/^[^\p{L}\p{N}]+/u, '').trim(); if (u) document.getElementById('emb-user').textContent = '👤 ' + u; } catch {}
+  }
+  window.navTo = (to) => {
+    if (document.body.classList.contains('embed') && window.parent !== window) return window.parent.postMessage({ type: 'myhi-nav', to }, location.origin);
+    location.href = to === 'studio' ? '/studio' : to === 'voice' ? '/minutes' : '/';
+  };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let CFG = null, N = 1, CUR = null, POLL = null, REF = null, REF_MODE = 'all';
+  // ── 参考图：读成 data URI（长边压到 1568，够看图模型分析，也够出图模型参考）──
+  function setRef(dataUrl) {
+    REF = dataUrl;
+    const box = $('ref');
+    if (!REF) { box.className = 'ref'; box.innerHTML = '点这里选一张参考图，或拖进来 / Ctrl+V 粘贴'; $('ref-mode').style.display = 'none'; return; }
+    box.className = 'ref has';
+    box.innerHTML = `<img src="${REF}" alt=""><div>已选参考图<br><small style="color:var(--muted)">下面选模仿什么</small></div><button class="rm" title="去掉参考图" onclick="event.stopPropagation();setRef(null)">✕</button>`;
+    $('ref-mode').style.display = 'flex';
+    refHint();
+  }
+  // 参考图怎么用：只有「保持人物样貌」+ 支持人像参考的模型才把原图直接给出图模型，其余都是看图拆要点写进提示词
+  function refHint() {
+    const h = $('ref-hint'); if (!h) return;
+    if (!REF) { h.style.display = 'none'; return; }
+    const m = CFG?.models?.find((x) => x.id === $('model').value) || {};
+    h.style.display = '';
+    h.innerHTML = REF_MODE === 'person'
+      ? (m.refImage ? '会把参考图直接交给 ' + esc(m.id) + '，画出同一个人（人像主体参考）' : '<span class="warn">当前模型不支持人像参考图，只能按描述去模仿，人物不会完全一样；要保持样貌请选 ' + esc((CFG?.models || []).filter((x) => x.refImage).map((x) => x.id).join(' / ') || '支持参考图的模型（如 image-01）') + '</span>')
+      : (CFG?.visionModel ? '看图模型先把参考图拆成要点，再写进出图提示词' : '<span class="warn">没有配置「看图」模型，参考图用不上（首页 ⚙ 设置 › 系统设置 · 模型 › 看图）</span>');
+  }
+  window.setRef = setRef;
+  function readRef(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const k = Math.min(1, 1568 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      setRef(c.toDataURL('image/jpeg', 0.9));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); alert('读不了这张图片'); };
+    img.src = url;
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    $('ref-file').onchange = (e) => { readRef(e.target.files[0]); e.target.value = ''; };
+    const box = $('ref');
+    ['dragover', 'dragenter'].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.remove('drag'); }));
+    box.addEventListener('drop', (e) => readRef(e.dataTransfer.files[0]));
+    document.addEventListener('paste', (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); readRef(f); } });
+    $('ref-mode').onclick = (e) => { const b = e.target.closest('[data-m]'); if (!b) return; REF_MODE = b.dataset.m; $('ref-mode').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); refHint(); };
+  });
+  const STYLES = ['海报', '朋友圈配图', '电商主图', '横幅 Banner', '扁平插画', '写实摄影', '国潮'];
+  const STATUS = { queued: '排队中', generating: '出图中…', waiting: '网关忙，等待重试…', retrying: '重新出图中…', ocr: '文字比对中…', vision: '看图复核中…', passed: '合格', needs_review: '需人工确认', failed: '失败' };
+
+  async function api(path, opt) {
+    const r = await fetch(path, opt);
+    if (r.status === 401 || r.redirected) { location.href = '/'; throw new Error('需要登录'); }
+    return r.json();
+  }
+
+  async function loadConfig() {
+    const d = await api('/api/studio/config').catch((e) => ({ ok: false, error: e.message }));
+    CFG = d;
+    const sel = $('model');
+    if (!d.ok || !d.gateway) {
+      sel.innerHTML = '<option value="">（没有配置大模型网关）</option>';
+      $('go').disabled = true;
+      $('qc-hint').innerHTML = '<span class="err">' + esc(d.error || '出图需要先配置大模型网关：首页 ⚙ 设置 › 系统设置 · 大模型网关') + '</span>';
+      return;
+    }
+    if (!d.models.length) {
+      sel.innerHTML = '<option value="">（网关上没有出图模型）</option>';
+      $('go').disabled = true;
+      $('qc-hint').innerHTML = '<span class="err">网关上还没有可用的出图模型，请联系网关管理员开通（如 glm-image、cogview-4、image-01）。</span>';
+    } else {
+      sel.innerHTML = d.models.map((m) => `<option value="${esc(m.id)}">${esc(m.name !== m.id ? m.name + ' · ' + m.id : m.id)}${m.price != null ? ' · ' + (m.price ? m.price + ' 积分/张（≈¥' + Math.round(m.price * 10) / 100 + '）' : '免费') : ''}</option>`).join('');
+      sel.value = d.defaultModel && d.models.some((m) => m.id === d.defaultModel) ? d.defaultModel : d.models[0].id;
+      sel.onchange = renderModelOpts; renderModelOpts();
+    }
+    $('save-to').innerHTML = '<option value="">不保存（之后也可以手动保存）</option>' + (d.projects || []).map((p) => `<option value="${esc(p.cwd)}">${esc(p.name)}${p.title ? '（' + esc(p.title) + '）' : ''}</option>`).join('');
+    if (!d.refineModel) { $('refine').checked = false; $('refine').disabled = true; $('refine-hint').textContent = '需要先在系统设置里配置「问一问」模型'; }
+    const qc = [];
+    qc.push(d.visionModel ? `看图复核：${esc(d.visionModel)}` : '<span class="warn">没有配置「看图」模型，不做看图复核</span>');
+    qc.push(d.ocrApi === false ? '文字比对：网关还没有 OCR 接口，由看图模型核对文字' : '文字比对：网关 OCR（有 OCR 接口时自动使用）');
+    if (d.imagesApi === false) qc.push('<span class="warn">网关还没有出图接口，暂经对话接口出图，尺寸选项不生效</span>');
+    $('qc-hint').innerHTML = qc.join('<br>');
+    const t = d.token;
+    if (t && t.dailyLimit != null) $('quota').textContent = `积分：今日已用 ${t.dailyUsed ?? '?'} / ${t.dailyLimit}`;
+  }
+  function renderModelOpts() {
+    const m = CFG.models.find((x) => x.id === $('model').value) || {};
+    $('size').innerHTML = (m.sizes || []).map((s) => `<option value="${esc(s.value)}">${esc(s.label)}</option>`).join('');
+    const vs = m.variants || [], vSel = $('variant'), keep = vSel.value;
+    $('variant-row').style.display = vs.length ? '' : 'none';
+    vSel.innerHTML = vs.map((v) => `<option value="${esc(v)}">${esc(v)}${v === m.defaultVariant ? '（默认' + (m.price != null ? '，' + m.price + ' 积分/张' : '') + '）' : ''}</option>`).join('');
+    vSel.value = vs.includes(keep) ? keep : (m.defaultVariant || vs[0] || '');
+    const tips = [];
+    if (m.seconds) tips.push('一张约 ' + m.seconds + ' 秒');
+    if (m.promptMax) tips.push('提示词上限 ' + m.promptMax + ' 字（超了自动精简描述，必须出现的文字不删）');
+    if (m.refImage) tips.push('支持人像参考图');
+    $('model-hint').textContent = tips.join(' · ');
+    refHint();
+    const max = m.maxN || 4; if (N > max) N = max;
+    $('n-seg').innerHTML = Array.from({ length: max }, (_, i) => `<button class="${i + 1 === N ? 'on' : ''}" onclick="setN(${i + 1})">${i + 1} 张</button>`).join('');
+  }
+  window.setN = (n) => { N = n; renderModelOpts(); };
+  $('style-chips').innerHTML = STYLES.map((s) => `<button class="chip" type="button">${esc(s)}</button>`).join('');
+  $('style-chips').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; const v = $('style').value.trim(); $('style').value = v ? v + '，' + b.textContent : b.textContent; };
+
+  window.startJob = async function () {
+    const need = $('need').value.trim();
+    if (!need) { $('need').focus(); $('need').placeholder = '先写下要一张什么样的图'; return; }
+    $('go').disabled = true; $('go').textContent = '提交中…';
+    const body = { need, texts: $('texts').value, style: $('style').value, model: $('model').value, size: $('size').value, variant: $('variant-row').style.display === 'none' ? '' : $('variant').value, n: N, refine: $('refine').checked, saveTo: $('save-to').value || null, refImage: REF || null, refMode: REF_MODE };
+    const d = await api('/api/studio/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch((e) => ({ ok: false, error: e.message }));
+    $('go').disabled = false; $('go').textContent = '开始出图';
+    if (!d.ok) { $('result').innerHTML = '<div class="empty err">' + esc(d.error || '提交失败') + '</div>'; return; }
+    showJob(d.job); loadHistory();
+  };
+
+  function imgUrl(job, f, dl) { return `/api/studio/jobs/${encodeURIComponent(job.id)}/file/${encodeURIComponent(f)}${dl ? '?download=1' : ''}`; }
+  function attHtml(a, job) {
+    const parts = [`<span class="t">第 ${a.n} 次</span>`];
+    if (a.error) parts.push(`<span class="no">出错：${esc(a.error)}</span>`);
+    if (a.wait && !a.error) parts.push(`<span class="warn">网关忙，稍后自动重试：${esc(a.wait)}</span>`);
+    if (a.ocr?.checks) parts.push('文字：' + a.ocr.checks.map((c) => `<span class="${c.ok ? 'ok' : 'no'}">「${esc(c.text)}」${c.ok ? '✓' : '✗ ' + Math.round(c.score * 100) + '%'}</span>`).join(' '));
+    else if (a.ocr?.error) parts.push(`<span class="warn">OCR 出错：${esc(a.ocr.error)}</span>`);
+    if (a.vision?.error) parts.push(`<span class="warn">看图复核出错：${esc(a.vision.error)}</span>`);
+    else if (a.vision) parts.push(`看图：<span class="${a.vision.pass ? 'ok' : 'no'}">${a.vision.pass ? '合格' : '不合格'}</span>${a.vision.issues?.length ? '：' + a.vision.issues.map(esc).join('；') : ''}`);
+    if (a.ms) parts.push(`<span style="color:var(--muted)">${Math.round(a.ms / 1000)} 秒${a.credits ? ' · ' + a.credits + ' 积分' : ''}</span>`);
+    return `<div class="att">${parts.join('<br>')}</div>`;
+  }
+  function slotHtml(job, s) {
+    const running = !['passed', 'needs_review', 'failed'].includes(s.status) && job.status === 'running';
+    const shown = s._view || s.best || [...s.attempts].reverse().find((a) => a.file)?.file;
+    const badge = running ? `<span class="badge b-run">${esc(STATUS[s.status] || s.status)}</span>`
+      : s.status === 'passed' ? (s.verdict === 'unchecked' ? '<span class="badge b-unchecked">未质检</span>' : '<span class="badge b-pass">合格</span>')
+      : s.status === 'needs_review' ? '<span class="badge b-review">需人工确认</span>' : `<span class="badge b-fail">${job.status === 'cancelled' ? '已取消' : '失败'}</span>`;
+    const files = s.attempts.filter((a) => a.file);
+    return `<div class="slot"><div class="pic">${shown ? `<img src="${imgUrl(job, shown)}" alt="" onclick="zoom(this.src)">` : `<div class="wait">${running ? esc(STATUS[s.status] || '') + '<br><small>出一张图通常要 20~75 秒</small>' : '没有出图'}</div>`}${badge}</div>
+      <div class="body">${files.length > 1 ? `<div class="thumbs">${files.map((a) => `<img src="${imgUrl(job, a.file)}" class="${a.file === shown ? 'on' : ''}" title="第 ${a.n} 次" onclick="viewAtt('${jsq(job.id)}',${s.index},'${jsq(a.file)}')">`).join('')}</div>` : ''}
+        ${s.attempts.map((a) => attHtml(a, job)).join('')}</div>
+      ${shown ? `<div class="acts"><a class="btn" href="${imgUrl(job, shown, 1)}" download>下载</a>${CFG?.projects?.length ? `<button class="btn" onclick="saveOne('${jsq(shown)}')">保存到项目</button>` : ''}<button class="btn" onclick="useAsRef('${jsq(shown)}')" title="用这张当参考图，改需求再出">当参考图</button></div>` : ''}</div>`;
+  }
+  function showJob(job) {
+    CUR = job;
+    const sum = job.slots.reduce((a, s) => (a[s.status] = (a[s.status] || 0) + 1, a), {});
+    const lastPrompt = job.slots.flatMap((s) => s.attempts).map((a) => a.prompt).filter(Boolean)[0] || job.prompt;
+    $('result').innerHTML = `<div id="job-hd"><b>${esc(job.need.length > 40 ? job.need.slice(0, 40) + '…' : job.need)}</b>
+        <span class="meta">${esc(job.model)} · ${job.n} 张 · ${new Date(job.createdAt).toLocaleString()}${job.credits ? ' · 共 ' + job.credits + ' 积分' : ''}</span>
+        <span class="act">${job.status === 'running' ? '<button class="btn danger" onclick="cancelJob()">停止</button>' : '<button class="btn" onclick="again()">再出一次</button><button class="btn" onclick="editAgain()">改需求重出</button>'}</span></div>
+      ${job.status === 'running' ? `<div class="hint" style="margin:-0.3rem 0 0.6rem">正在出图：合格 ${sum.passed || 0} / ${job.n}。可以离开这个页面，回来在「历史」里查看。</div>` : ''}
+      ${job.stage ? `<div class="hint">${esc(job.stage)}</div>` : ''}
+      ${job.ref ? `<div class="refbox"><img src="${imgUrl(job, job.ref.file)}" alt="" onclick="zoom(this.src)"><div><b>参考图 · ${{ style: '模仿风格配色', layout: '模仿构图版式', all: '都照着做', person: '保持人物样貌' }[job.ref.mode] || ''}</b>${job.ref.direct ? ' <span class="ok">· 已直接发给出图模型</span>' : ''}<div class="d">${job.ref.desc ? esc(job.ref.desc) : job.ref.direct ? '原图直接交给出图模型，不用再拆要点' : job.status === 'running' ? '分析中…' : '（没有分析结果）'}</div></div></div>` : ''}
+      ${job.error ? `<div class="hint err">${esc(job.error)}</div>` : ''}
+      ${(job.notes || []).map((n) => `<div class="hint warn">${esc(n)}</div>`).join('')}
+      ${(job.savedTo || []).length ? `<div class="hint ok">已保存到项目：${job.savedTo.map(esc).join('、')}</div>` : ''}
+      <div class="slots" style="margin-top:0.5rem">${job.slots.map((s) => slotHtml(job, s)).join('')}</div>
+      ${lastPrompt ? `<details class="pr"><summary>出图提示词</summary><pre>${esc(lastPrompt)}</pre></details>` : ''}`;
+    document.querySelectorAll('#hist .h').forEach((h) => h.classList.toggle('on', h.dataset.id === job.id));
+    clearTimeout(POLL);
+    if (job.status === 'running') POLL = setTimeout(() => refreshJob(job.id), 2000);
+  }
+  async function refreshJob(id) {
+    const d = await api('/api/studio/jobs/' + encodeURIComponent(id)).catch(() => null);
+    if (!d?.ok || CUR?.id !== id) return;
+    const views = Object.fromEntries((CUR.slots || []).map((s) => [s.index, s._view]));
+    d.job.slots.forEach((s) => { if (views[s.index]) s._view = views[s.index]; });
+    const was = CUR.status;
+    showJob(d.job);
+    if (was === 'running' && d.job.status !== 'running') loadHistory();
+  }
+  window.viewAtt = (id, i, f) => { if (CUR?.id !== id) return; CUR.slots[i]._view = f; showJob(CUR); };
+  window.zoom = (src) => { $('zoom').querySelector('img').src = src; $('zoom').classList.add('on'); };
+  window.cancelJob = async () => { if (!CUR) return; await api(`/api/studio/jobs/${CUR.id}/cancel`, { method: 'POST' }).catch(() => {}); refreshJob(CUR.id); };
+  async function fillRef(job) {
+    if (!job.ref) return setRef(null);
+    try {
+      const b = await (await fetch(imgUrl(job, job.ref.file))).blob();
+      const r = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); });
+      setRef(r); REF_MODE = job.ref.mode || 'all';
+      $('ref-mode').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.m === REF_MODE));
+    } catch { setRef(null); }
+  }
+  function fillForm(job) {
+    $('need').value = job.need; $('texts').value = (job.texts || []).join('\n'); $('style').value = job.style || '';
+    if (CFG?.models?.some((m) => m.id === job.model)) { $('model').value = job.model; renderModelOpts(); if (job.size) $('size').value = job.size; }
+    N = job.n || 1; renderModelOpts(); if (job.size) $('size').value = job.size; if (job.variant) $('variant').value = job.variant;
+  }
+  window.again = async () => { if (CUR) { fillForm(CUR); await fillRef(CUR); startJob(); } };
+  window.editAgain = async () => { if (CUR) { fillForm(CUR); await fillRef(CUR); $('need').focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
+  // 用某张出好的图当参考，接着出
+  window.useAsRef = async (file) => {
+    if (!CUR) return;
+    const b = await (await fetch(imgUrl(CUR, file))).blob();
+    const r = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); });
+    fillForm(CUR); setRef(r); $('need').focus(); document.querySelector('#wrap > div')?.scrollTo?.({ top: 0, behavior: 'smooth' }); window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  window.saveOne = async (file) => {
+    const ps = CFG?.projects || [];
+    let cwd = $('save-to').value;
+    if (!cwd) {
+      const pick = prompt('保存到哪个项目？输入序号：\n' + ps.map((p, i) => `${i + 1}. ${p.name}${p.title ? '（' + p.title + '）' : ''}`).join('\n'));
+      const k = parseInt(pick, 10); if (!k || !ps[k - 1]) return; cwd = ps[k - 1].cwd;
+    }
+    const d = await api(`/api/studio/jobs/${CUR.id}/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd, files: [file] }) }).catch((e) => ({ ok: false, error: e.message }));
+    alert(d.ok ? '已保存到：\n' + d.saved.join('\n') : '保存失败：' + d.error);
+    refreshJob(CUR.id);
+  };
+  async function loadHistory() {
+    const d = await api('/api/studio/jobs').catch(() => null);
+    const jobs = d?.jobs || [];
+    $('hist').innerHTML = jobs.length ? jobs.map((j) => `<div class="h" data-id="${esc(j.id)}" data-st="${esc(j.status)}">${j.thumbs[0] ? `<img src="${imgUrl(j, j.thumbs[0])}" alt="">` : '<img alt="">'}<div class="x"><div>${esc(j.need)}</div><small>${new Date(j.createdAt).toLocaleString()} · ${j.status === 'running' ? '出图中' : j.status === 'cancelled' ? '已取消' : j.thumbs.length + ' 张'}</small></div></div>`).join('')
+      : '<div class="empty" style="padding:1rem">还没有出过图</div>';
+    $('hist').querySelectorAll('.h').forEach((h) => h.onclick = async () => {
+      const r = await api('/api/studio/jobs/' + encodeURIComponent(h.dataset.id)).catch(() => null);
+      if (r?.ok) { showJob(r.job); if (innerWidth <= 860) $('result').scrollIntoView({ behavior: 'smooth' }); }
+    });
+    if (CUR) document.querySelectorAll('#hist .h').forEach((h) => h.classList.toggle('on', h.dataset.id === CUR.id));
+    histDecorate();
+  }
+  // ── 删除历史：单条 🗑 / 管理模式多选 / 清空（成员只删自己的，管理员能删全部；进行中的不删）──
+  const RESULT0 = $('result').innerHTML;   // 删掉当前打开的那条后，右侧回到初始说明
+  let HMAN = false;
+  const HBUSY = ["running"];
+  const histSelIds = () => [...$('hist').querySelectorAll('.hsel:checked')].map((c) => c.closest('.h').dataset.id);
+  function histUpdSel() {
+    const n = histSelIds().length, b = $('hist-delsel');
+    b.textContent = n ? '删除所选（' + n + '）' : '删除所选'; b.disabled = !n;
+  }
+  function histAfterDelete(ids) {
+    if (CUR && ids.includes(CUR.id)) { clearTimeout(POLL); CUR = null; $('result').innerHTML = RESULT0; }
+    loadHistory();
+  }
+  async function histPost(body) {
+    const d = await api('/api/studio/jobs/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch((e) => ({ ok: false, error: e.message }));
+    if (!d.ok) { alert('删除失败：' + (d.error || '未知错误')); return null; }
+    if (d.busy) alert('已删除 ' + d.deleted + ' 条；还有 ' + d.busy + ' 条正在进行，没有删除（先取消再删）');
+    return d;
+  }
+  window.histDelOne = async (ev, id) => {
+    ev.stopPropagation();
+    if (!confirm('删除这条出图？图片文件会一起删掉（已保存到项目里的不受影响），不可恢复。')) return;
+    const d = await api('/api/studio/jobs/' + encodeURIComponent(id), { method: 'DELETE' }).catch((e) => ({ ok: false, error: e.message }));
+    if (!d.ok) return alert('删除失败：' + (d.error || '未知错误'));
+    histAfterDelete([id]);
+  };
+  window.histManage = (on) => {
+    HMAN = on;
+    $('hist').classList.toggle('man', on);
+    $('hist-bar').style.display = on ? 'flex' : 'none';
+    $('hist-man').textContent = on ? '完成' : '管理';
+    if (!on) $('hist').querySelectorAll('.hsel').forEach((c) => { c.checked = false; });
+    histUpdSel();
+  };
+  window.histSelAll = () => {
+    const cs = [...$('hist').querySelectorAll('.hsel:not(:disabled)')];
+    const all = cs.length && cs.every((c) => c.checked);
+    cs.forEach((c) => { c.checked = !all; });
+    histUpdSel();
+  };
+  window.histDelSel = async () => {
+    const ids = histSelIds();
+    if (!ids.length || !confirm('删除选中的 ' + ids.length + ' 条出图？图片文件会一起删掉（已保存到项目里的不受影响），不可恢复。')) return;
+    if (await histPost({ ids })) histAfterDelete(ids);
+  };
+  window.histClear = async () => {
+    if (!confirm('清空全部出图历史？图片文件会一起删掉（已保存到项目里的不受影响），不可恢复。\n（管理员会清掉所有成员的；正在进行的不删）')) return;
+    const d = await histPost({ all: true });
+    if (d) { histManage(false); histAfterDelete(CUR && !HBUSY.includes(CUR.status) ? [CUR.id] : []); }
+  };
+  // 每次重画列表后：给每行补上勾选框和 🗑，管理模式下点整行 = 勾选
+  function histDecorate() {
+    $('hist').querySelectorAll('.h').forEach((h) => {
+      const busy = HBUSY.includes(h.dataset.st);
+      const c = document.createElement('input'); c.type = 'checkbox'; c.className = 'hsel'; c.disabled = busy;
+      c.title = busy ? '正在进行，不能删除' : '选择';
+      c.onclick = (e) => e.stopPropagation(); c.onchange = histUpdSel;
+      h.prepend(c);
+      if (!busy) { const d = document.createElement('span'); d.className = 'hdel'; d.textContent = '🗑'; d.title = '删除'; d.onclick = (e) => histDelOne(e, h.dataset.id); h.append(d); }
+      const open = h.onclick;
+      h.onclick = (e) => { if (HMAN) { if (!c.disabled) { c.checked = !c.checked; histUpdSel(); } return; } open?.(e); };
+    });
+    histUpdSel();
+  }
+  loadConfig(); loadHistory();
+  const q = new URLSearchParams(location.search).get('job');
+  if (q) api('/api/studio/jobs/' + encodeURIComponent(q)).then((r) => r?.ok && showJob(r.job)).catch(() => {});
+</script>
+</body>
+</html>

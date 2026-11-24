@@ -1,0 +1,26 @@
+node_modules/
+dist/
+upload/
+release/
+*.tgz
+
+# Local scratch / debug artifacts — not part of the package
+.scratch/
+.tmp/
+.playwright-cli/
+
+# 部署包里管理员预置的敏感配置——绝不进 git（含密钥）
+installer/gateway.json
+installer/secrets.json
+installer/linux/gateway.json
+
+# 本地 / 私密文件（开源后防止误提交）
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
+coverage/
+.claude/
+installer/**/gateway.json
+installer/**/secrets.json

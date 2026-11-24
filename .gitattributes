@@ -1,0 +1,11 @@
+# Linux shell 脚本必须 LF：autocrlf 机上 checkout 出 CRLF 会让 bash 直接跑不起来
+*.sh text eol=lf
+# bin/*.js 带 #!/usr/bin/env node shebang、经 npm 装到 Linux 直接执行——CRLF 会让 env 找不到 "node\r"
+# （Windows 上 autocrlf 会把工作区改成 CRLF，npm pack 会原样打进包）
+*.js text eol=lf
+# 并行线合并踩坑（1.3.219 发布前发现）：autocrlf 机上 merge/checkout 会把无 eol 规则的文本
+# smudge 成 CRLF，build 原样拷进 dist → tarball 带回 CR。文本类全部钉死 LF。
+*.html text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.md text eol=lf

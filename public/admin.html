@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>myhi 管理</title>
+  <script src="/lib/machine.js"></script>
+  <script src="/lib/icons.js"></script>
+  <script src="/theme.js"></script>
+  <script>
+    // 主题与其他页面一致：浏览器选过的优先，否则服务端默认（新装浅色、老机器深色）
+    (function(){try{var t=localStorage.getItem('myhi_theme')||window.MYHI_DEFAULT_THEME||'dark';
+      if(t==='system') t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+      if(t!=='dark') document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+  </script>
+<style>
+  :root { --bg:#0d1117; --surface:#161b22; --text:#e6edf3; --text2:#b1bac4; --text3:#8b949e; --muted:#6e7681;
+    --line:rgba(255,255,255,0.06); --border:rgba(255,255,255,0.12); --border2:#30363d; --accent:#7c3aed; }
+  :root[data-theme="light"] { --bg:#f6f8fa; --surface:#ffffff; --text:#1f2328; --text2:#424a53; --text3:#57606a; --muted:#6e7781;
+    --line:rgba(0,0,0,0.06); --border:#d0d7de; --border2:#d0d7de; --accent:#8250df; }
+  :root[data-theme="black"] { --bg:#000000; --surface:#0a0a0a; --border2:#262626; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
+  .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 100%; max-width: 360px; }
+  .login-box h2 { text-align: center; margin-bottom: 1.5rem; font-size: 1.2rem; }
+  .login-box input { width: 100%; padding: 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; margin-bottom: 1rem; }
+  .login-box button { width: 100%; padding: 0.8rem; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  .login-box .err { color: #f85149; font-size: 0.85rem; text-align: center; margin-bottom: 0.5rem; min-height: 1.2em; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 1rem; }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
+  .header h1 { font-size: 1.1rem; }
+  .header .logout { background: none; border: 1px solid var(--border); color: var(--text3); padding: 0.3rem 0.8rem; border-radius: 8px; cursor: pointer; font-size: 0.8rem; }
+  .ver-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.5rem; margin-bottom: 1.2rem; }
+  .ver-big { font-size: 2rem; font-weight: 800; color: var(--accent); }
+  .ver-sub { font-size: 0.85rem; color: var(--text3); margin-top: 0.5rem; }
+  .ver-sub b { color: #3fb950; }
+  .actions { display: flex; gap: 0.8rem; margin-bottom: 1.5rem; }
+  .actions button { flex: 1; padding: 0.8rem; border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+  .btn-up { background: var(--accent); color: #fff; }
+  .btn-up:disabled { background: var(--border2); color: var(--muted); cursor: not-allowed; }
+  .btn-up.glow { background: #3fb950; animation: pulse 2s infinite; }
+  .btn-re { background: var(--line); color: var(--text); border: 1px solid var(--border) !important; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+  .card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.8rem; }
+  /* 模型（按场景）：每行 标题+说明 / 下拉（网关模型）+ 手填 */
+  .m-row { padding: 0.55rem 0; border-top: 1px solid var(--line); }
+  .m-row:first-child { border-top: none; }
+  .m-lbl { font-size: 0.82rem; font-weight: 600; }
+  .m-hint { font-size: 0.72rem; color: var(--muted); line-height: 1.5; margin: 0.15rem 0 0.35rem; }
+  .m-ctl { display: flex; gap: 0.4rem; }
+  .m-ctl select, .m-ctl input { flex: 1; min-width: 0; padding: 0.45rem 0.55rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.82rem; }
+  .m-ctl input { display: none; }
+  .m-ctl.manual input { display: block; }
+  .m-warn { font-size: 0.72rem; color: #d29922; margin-top: 0.25rem; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { background: none; border: none; color: var(--text2); padding: 0.4rem 0.9rem; font-size: 0.8rem; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .seg button:disabled { cursor: default; opacity: 0.6; }
+  .row { font-size: 0.82rem; color: var(--text2); padding: 0.5rem 0; line-height: 1.5; display: flex; justify-content: space-between; align-items: center; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row-actions { display: flex; gap: 0.4rem; }
+  .row-actions button { background: none; border: 1px solid var(--border); color: var(--text3); padding: 0.2rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; }
+  .row-actions button:hover { color: var(--text); border-color: var(--border2); }
+  .row-actions .del { color: #f85149; border-color: rgba(248,81,73,0.3); }
+  .inp { padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.85rem; width: 100%; }
+  .inp-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+  .inp-row .inp { flex: 1; }
+  .btn-sm { padding: 0.5rem 1rem; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; white-space: nowrap; }
+  .btn-sm.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .mode-status { font-size: 0.85rem; line-height: 1.6; padding: 0.6rem 0.75rem; border-radius: 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.25); margin-bottom: 0.5rem; }
+  .mode-status b { color: var(--text); }
+  .mode-status small { display: block; color: var(--text3); font-size: 0.75rem; }
+  .sw { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span { position: absolute; inset: 0; background: var(--border2); border-radius: 11px; cursor: pointer; transition: 0.2s; }
+  .sw span::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+  .sw input:checked + span { background: var(--accent); }
+  .sw input:checked + span::before { transform: translateX(16px); }
+  .dir-pick { border: 1px solid var(--border); border-radius: 8px; max-height: 220px; overflow-y: auto; margin-bottom: 0.5rem; font-size: 0.8rem; }
+  .dir-pick div { padding: 0.4rem 0.6rem; cursor: pointer; color: var(--text2); }
+  .dir-pick div:hover { background: var(--line); }
+  .dir-pick .cur { color: var(--text3); font-size: 0.72rem; cursor: default; border-bottom: 1px solid var(--line); }
+  .msg { font-size: 0.8rem; margin-top: 0.3rem; min-height: 1.2em; }
+  .msg-ok { color: #3fb950; }
+  .msg-err { color: #f85149; }
+  .status-msg { text-align: center; padding: 1rem; color: var(--text3); font-size: 0.85rem; }
+  .uptime { font-size: 0.78rem; color: var(--muted); text-align: center; margin-top: 1rem; }
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="pg-login">
+  <div class="login-box">
+    <h2>myhi 管理</h2>
+    <div class="err" id="login-err"></div>
+    <input type="password" id="admin-pwd" placeholder="输入管理密码" autofocus>
+    <button onclick="doLogin()">登录</button>
+  </div>
+</div>
+
+<div class="wrap" id="pg-admin" style="display:none">
+  <div class="header">
+    <h1>myhi 管理</h1>
+    <button class="logout" onclick="doLogout()">退出</button>
+  </div>
+
+  <!-- 版本 + 升级 -->
+  <div class="ver-card">
+    <div style="font-size:0.8rem;color:var(--text3)">当前版本</div>
+    <div class="ver-big" id="v-cur">--</div>
+    <div class="ver-sub" id="v-latest"></div>
+  </div>
+  <div class="actions">
+    <button class="btn-up" id="btn-up" onclick="doUpgrade()" disabled>已是最新</button>
+    <button class="btn-re" onclick="doRestart()">重启</button>
+  </div>
+  <div id="op-msg" class="status-msg" style="display:none"></div>
+
+  <!-- Claude Code 版本 + 升级 -->
+  <div class="ver-card">
+    <div style="font-size:0.8rem;color:var(--text3)">Claude Code 版本</div>
+    <div class="ver-big" id="cl-cur">--</div>
+    <div class="ver-sub" id="cl-latest"></div>
+  </div>
+  <div class="actions">
+    <button class="btn-up" id="btn-cl-up" onclick="doClaudeUpgrade()" disabled>已是最新</button>
+  </div>
+  <div id="cl-msg" class="status-msg" style="display:none"></div>
+
+  <!-- 在线用户 -->
+  <div class="card">
+    <h3>在线用户</h3>
+    <div id="online-users"><div class="row" style="color:var(--muted)">加载中...</div></div>
+  </div>
+
+  <!-- 活跃会话 -->
+  <div class="card">
+    <h3>活跃会话</h3>
+    <div id="active-sessions"><div class="row" style="color:var(--muted)">加载中...</div></div>
+  </div>
+
+  <!-- 用户管理 -->
+  <div class="card" id="mode">
+    <h3>使用模式</h3>
+    <div id="mode-status" class="mode-status"></div>
+    <div id="user-list"></div>
+    <div id="excl-row" class="row" style="display:none">
+      <span>独占模式<br><small style="color:var(--muted)">同一时间只允许一个人登录，别人登录会被挡住</small></span>
+      <label class="sw"><input type="checkbox" id="excl-toggle" onchange="setExclusive(this.checked)"><span></span></label>
+    </div>
+    <button class="btn-sm" id="add-open" onclick="openAddMember()" style="margin-top:0.6rem;width:100%"></button>
+    <div id="add-member" style="display:none;margin-top:0.7rem">
+      <div class="inp-row"><input class="inp" id="u-name" placeholder="成员名称（如：张三）"></div>
+      <div class="inp-row">
+        <input class="inp" id="u-pwd" placeholder="登录密码（至少 4 位）" autocomplete="off">
+        <button class="btn-sm ghost" onclick="genPwd()">随机生成</button>
+      </div>
+      <div class="inp-row">
+        <input class="inp" id="u-dir" placeholder="工作目录（留空 = 不限制）">
+        <button class="btn-sm ghost" onclick="pickDir()">浏览…</button>
+      </div>
+      <div id="dir-pick" style="display:none" class="dir-pick"></div>
+      <div class="inp-row" style="margin-top:0.2rem">
+        <button class="btn-sm ghost" onclick="closeAddMember()" style="flex:1">取消</button>
+        <button class="btn-sm" onclick="addUser()" style="flex:2">添加</button>
+      </div>
+    </div>
+    <div class="msg" id="u-msg"></div>
+    <div id="mode-foot" style="font-size:0.72rem;color:var(--muted);margin-top:0.5rem;line-height:1.5"></div>
+  </div>
+
+  <!-- 全局设置：对这台 myhi 的所有人、所有设备生效（首页 ⚙ 里成员只能看不能改） -->
+  <div class="card" id="global">
+    <h3>全局设置</h3>
+    <div style="font-size:0.78rem;margin-bottom:0.3rem">本机显示名 <small style="color:var(--muted)">首页 / 分屏的浏览器标签显示它，用来区分多台电脑；不改电脑主机名，留空用主机名</small></div>
+    <div class="inp-row">
+      <input class="inp" id="g-name" maxlength="32" placeholder="主机名" autocomplete="off">
+      <button class="btn-sm" onclick="saveMachineName()">保存</button>
+    </div>
+    <div class="msg" id="g-name-msg"></div>
+    <div style="font-size:0.78rem;margin:0.5rem 0 0.3rem">语音识别地址 <small style="color:var(--muted)">留空 = 不用语音输入；改后重启 myhi 生效</small></div>
+    <div class="inp-row">
+      <input class="inp" id="g-asr" placeholder="http://…:8765" autocomplete="off">
+      <button class="btn-sm" onclick="saveAsr()">保存</button>
+    </div>
+    <div class="msg" id="g-asr-msg"></div>
+    <div style="font-size:0.78rem;margin:0.5rem 0 0.3rem">出图 / 语音历史保留天数 <small style="color:var(--muted)">超过这么多天的历史（图片、录音、纪要）每天自动删除；留空或 0 = 一直保留</small></div>
+    <div class="inp-row">
+      <input class="inp" id="g-hist" type="number" min="0" max="36500" step="1" inputmode="numeric" placeholder="一直保留" autocomplete="off">
+      <button class="btn-sm" onclick="saveHistDays()">保存</button>
+    </div>
+    <div class="msg" id="g-hist-msg"></div>
+  </div>
+
+  <!-- 服务：访问协议 / 升级下载源（多用户模式下成员在首页 ⚙ 里看不到这两项）-->
+  <div class="card" id="svc">
+    <h3>服务</h3>
+    <div style="font-size:0.78rem;margin-bottom:0.3rem">访问协议 <small style="color:var(--muted)">HTTPS 才能在手机上用麦克风 / 摄像头；内网只想少点「不安全」提示可用 HTTP。切换会重启 myhi</small></div>
+    <div class="seg" id="svc-proto"><button data-p="https">HTTPS</button><button data-p="http">HTTP</button></div>
+    <div class="msg" id="svc-proto-msg"></div>
+    <div style="font-size:0.78rem;margin:0.6rem 0 0.3rem">升级下载源 <small style="color:var(--muted)">myhi 和 Claude 升级从哪下载。自动：先官方源，连不上或装失败自动换国内镜像</small></div>
+    <div class="seg" id="svc-reg"><button data-r="auto">自动</button><button data-r="official">官方</button><button data-r="mirror">国内镜像</button></div>
+    <div class="msg" id="svc-reg-msg"></div>
+  </div>
+
+  <!-- 修改管理密码 -->
+  <div class="card">
+    <h3>修改管理密码</h3>
+    <div class="inp-row">
+      <input type="password" class="inp" id="new-pwd" placeholder="新密码">
+      <button class="btn-sm" onclick="changePwd()">保存</button>
+    </div>
+    <div class="msg" id="pwd-msg"></div>
+  </div>
+
+  <!-- 大模型网关 -->
+  <div class="card">
+    <h3>大模型网关</h3>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.6rem;line-height:1.5">
+      配置后新建的 Claude 会话自动注入 <code style="background:var(--surface);padding:0.1em 0.3em;border-radius:3px">ANTHROPIC_BASE_URL</code> / <code style="background:var(--surface);padding:0.1em 0.3em;border-radius:3px">ANTHROPIC_API_KEY</code>
+    </div>
+    <div id="gw-src" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;line-height:1.5"></div>
+    <div class="inp-row">
+      <input type="text" class="inp" id="gw-url" placeholder="网关 URL（如 https://gateway.example.com）；留空 = 自动用这台电脑已有的配置">
+    </div>
+    <div class="inp-row" style="margin-top:0.4rem">
+      <input type="password" class="inp" id="gw-key" placeholder="Token / API Key（留空保持不变）">
+      <button class="btn-sm" onclick="saveGateway()">保存</button>
+    </div>
+    <label style="display:flex;gap:0.5rem;align-items:flex-start;margin-top:0.5rem;font-size:0.78rem;cursor:pointer">
+      <input type="checkbox" id="gw-sync" style="margin-top:0.15rem">
+      <span>同时写入 Claude Code 配置<br><small id="gw-sync-hint" style="color:var(--muted)">终端里直接运行的 claude 也用这个网关。只改 ~/.claude/settings.json 里 env 的网关地址和 Key，其它设置不动，写之前先备份；取消勾选会把写进去的删掉</small></span>
+    </label>
+    <div class="msg" id="gw-msg"></div>
+  </div>
+
+  <!-- 模型（按场景，所有任务生效）：多用户模式下成员在首页 ⚙ 里只能看，这里是管理员配置的地方 -->
+  <div class="card" id="models-card">
+    <h3>模型（所有任务生效）</h3>
+    <div id="m-src" style="font-size:0.75rem;color:var(--muted);margin-bottom:0.4rem;line-height:1.5">读取中…</div>
+    <div id="m-rows"></div>
+    <div class="inp-row" id="m-save-row" style="margin-top:0.6rem;justify-content:flex-end"><button class="btn-sm" onclick="saveModels()">保存</button></div>
+    <div class="msg" id="m-msg"></div>
+  </div>
+
+  <!-- 命名密钥库 -->
+  <div class="card">
+    <h3>密钥库（Secret Vault）</h3>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.6rem;line-height:1.5">
+      集中存 GitLab PAT / 部署 token / 网关 key / 证书等敏感值，spawn 会话时注入成环境变量，AI/命令用
+      <code style="background:var(--surface);padding:0.1em 0.3em;border-radius:3px">$名字</code>
+      引用——密钥值不进聊天、不落 transcript。类型选「文件」（证书等）时注入的是路径
+      <code style="background:var(--surface);padding:0.1em 0.3em;border-radius:3px">$MYHI_SECRET_名字</code>。
+      作用域「项目」仅注给该 cwd 的会话（最小权限）。<b>密钥值绝不写进记忆/CLAUDE.md。</b>
+    </div>
+    <div id="sec-list" style="margin-bottom:0.6rem"></div>
+    <div class="inp-row" style="gap:0.4rem;flex-wrap:wrap">
+      <input type="text" class="inp" id="sec-name" placeholder="名字（如 GITLAB_PAT，作环境变量名）" style="flex:1;min-width:150px">
+      <select class="inp" id="sec-type" style="max-width:90px"><option value="env">变量</option><option value="file">文件</option></select>
+      <select class="inp" id="sec-scope" style="max-width:100px" onchange="toggleSecScope()"><option value="global">全局</option><option value="project">项目</option></select>
+    </div>
+    <div class="inp-row" id="sec-cwd-row" style="margin-top:0.4rem;display:none">
+      <input type="text" class="inp" id="sec-cwd" placeholder="项目 cwd（如 D:\project\myhi）">
+    </div>
+    <div class="inp-row" style="margin-top:0.4rem">
+      <input type="password" class="inp" id="sec-value" placeholder="密钥值 / 证书内容（编辑时留空保持不变）">
+      <button class="btn-sm" onclick="addSecret()">保存</button>
+    </div>
+    <div class="msg" id="sec-msg"></div>
+  </div>
+
+  <div class="uptime" id="uptime"></div>
+</div>
+
+<script>
+// 内联事件属性 onclick="f('${jsq(x)}')" 专用：先按 JS 单引号字符串转义，再按 HTML 属性转义。
+// 只做 HTML 转义不够 —— 浏览器先把 &#39; 解码回 ' 再交给 JS，文件名 / 技能名里带 ' 就能跳出字符串执行代码
+function jsq(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, '\\n').replace(/[\u2028\u2029]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+let T = sessionStorage.getItem('myhi_admin');
+const H = () => ({ 'Authorization': 'Bearer ' + T, 'Content-Type': 'application/json' });
+
+document.getElementById('admin-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogin() {
+  const pwd = document.getElementById('admin-pwd').value;
+  if (!pwd) return;
+  try {
+    const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd }) });
+    const d = await r.json();
+    if (d.ok) { T = d.token; sessionStorage.setItem('myhi_admin', T); showAdmin(); }
+    else document.getElementById('login-err').textContent = d.error || '密码错误';
+  } catch { document.getElementById('login-err').textContent = '连接失败'; }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('myhi_admin'); T = null;
+  document.getElementById('pg-admin').style.display = 'none';
+  document.getElementById('pg-login').style.display = '';
+}
+
+async function showAdmin() {
+  document.getElementById('pg-login').style.display = 'none';
+  document.getElementById('pg-admin').style.display = '';
+  await refresh();
+  setInterval(refresh, 10000);
+  loadGateway();
+  loadGlobal();
+  loadModels();
+  loadService();
+  loadSecrets();
+}
+
+function toggleSecScope() {
+  const isProj = document.getElementById('sec-scope').value === 'project';
+  document.getElementById('sec-cwd-row').style.display = isProj ? '' : 'none';
+}
+
+function escHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+
+async function loadSecrets() {
+  try {
+    const r = await fetch('/api/secrets', { headers: H() });
+    if (!r.ok) return;
+    const d = await r.json();
+    const box = document.getElementById('sec-list');
+    let html = '';
+    const row = (s, scope, cwd) => `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;border-bottom:1px solid var(--line);font-size:0.8rem">
+      <span style="color:var(--text);font-family:monospace">${escHtml(s.name)}</span>
+      <span style="color:var(--muted)">${s.type === 'file' ? '📄文件' : '🔑变量'}</span>
+      <span style="color:var(--muted);font-family:monospace;flex:1">${escHtml(s.preview)}</span>
+      <button class="btn-sm" style="padding:0.1rem 0.5rem" onclick="delSecret('${jsq(s.name)}','${scope}','${jsq(cwd || '')}')">删</button>
+    </div>`;
+    if (d.global && d.global.length) {
+      html += '<div style="color:var(--text3);font-size:0.72rem;margin:0.2rem 0">全局</div>';
+      html += d.global.map(s => row(s, 'global', '')).join('');
+    }
+    for (const p of (d.projects || [])) {
+      if (!p.secrets.length) continue;
+      html += `<div style="color:var(--text3);font-size:0.72rem;margin:0.4rem 0 0.2rem;font-family:monospace">项目 ${escHtml(p.cwd)}</div>`;
+      html += p.secrets.map(s => row(s, 'project', p.cwd)).join('');
+    }
+    box.innerHTML = html || '<div style="color:var(--muted);font-size:0.78rem">（暂无密钥）</div>';
+  } catch {}
+}
+
+async function addSecret() {
+  const name = document.getElementById('sec-name').value.trim();
+  const value = document.getElementById('sec-value').value;
+  const type = document.getElementById('sec-type').value;
+  const scope = document.getElementById('sec-scope').value;
+  const cwd = document.getElementById('sec-cwd').value.trim();
+  const msg = document.getElementById('sec-msg');
+  try {
+    const r = await fetch('/api/secrets', { method: 'POST', headers: H(), body: JSON.stringify({ name, value, type, scope, cwd }) });
+    const d = await r.json();
+    if (d.ok) {
+      msg.className = 'msg msg-ok';
+      msg.textContent = '已保存，新建（该作用域的）会话自动生效';
+      document.getElementById('sec-name').value = '';
+      document.getElementById('sec-value').value = '';
+      loadSecrets();
+    } else {
+      msg.className = 'msg msg-err';
+      msg.textContent = d.error || '失败';
+    }
+  } catch {
+    msg.className = 'msg msg-err';
+    msg.textContent = '连接失败';
+  }
+}
+
+async function delSecret(name, scope, cwd) {
+  if (!confirm(`删除密钥 ${name}？`)) return;
+  try {
+    await fetch('/api/secrets', { method: 'DELETE', headers: H(), body: JSON.stringify({ name, scope, cwd }) });
+    loadSecrets();
+  } catch {}
+}
+
+async function loadGlobal() {
+  try {
+    const m = await (await fetch('/api/machine-name', { headers: H() })).json();
+    const inp = document.getElementById('g-name');
+    inp.placeholder = m.hostname || '主机名';
+    inp.value = m.name === m.hostname ? '' : (m.name || '');
+    inp.disabled = !!m.fromEnv;
+    if (m.fromEnv) setMsg('g-name-msg', '已由环境变量 MYHI_NAME 指定，此处不可改', false);
+  } catch {}
+  try {
+    const c = await (await fetch('/api/server-config', { headers: H() })).json();
+    document.getElementById('g-asr').value = c.asrUrl || '';
+  } catch {}
+  loadHistDays();
+}
+function setMsg(id, text, ok) { const el = document.getElementById(id); el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err'); el.textContent = text; }
+// ── 服务：访问协议 / 升级下载源 ──
+async function loadService() {
+  try {
+    const d = await (await fetch('/api/server-mode', { headers: H() })).json();
+    const seg = document.getElementById('svc-proto');
+    seg.querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('on', (b.dataset.p === 'http') === d.httpOnly);
+      b.disabled = !!d.fromEnv;
+      b.onclick = () => switchProto(b.dataset.p === 'http', d);
+    });
+    if (d.fromEnv) setMsg('svc-proto-msg', '启动时设了环境变量 MYHI_NO_HTTPS，固定为 HTTP', false);
+  } catch {}
+  try {
+    const d = await (await fetch('/api/npm-registry', { headers: H() })).json();
+    const seg = document.getElementById('svc-reg');
+    const mark = (p) => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.r === p));
+    mark(d.pref);
+    if (!['auto', 'official', 'mirror'].includes(d.pref)) setMsg('svc-reg-msg', '当前用的是 config.json 里自定义的源：' + d.pref, true);
+    seg.querySelectorAll('button').forEach((b) => b.onclick = async () => {
+      try {
+        const r = await (await fetch('/api/npm-registry', { method: 'POST', headers: H(), body: JSON.stringify({ pref: b.dataset.r }) })).json();
+        if (!r.ok) throw new Error(r.error || '失败');
+        mark(r.pref); setMsg('svc-reg-msg', '已保存', true);
+      } catch (e) { setMsg('svc-reg-msg', '保存失败：' + e.message, false); }
+    });
+  } catch {}
+}
+async function switchProto(httpOnly, cur) {
+  if (httpOnly === cur.httpOnly) return;
+  const url = `${httpOnly ? 'http' : 'https'}://${location.hostname}:${cur.port}/admin`;
+  if (!confirm(`切换为 ${httpOnly ? 'HTTP' : 'HTTPS'}？\n\nmyhi 会重启（约 5 秒，正在执行的任务会被打断这一轮），之后访问地址变为：\n${url}\n切换后需要重新登录管理后台。\n\n${httpOnly ? '注意：HTTP 下手机等非本机浏览器不能用麦克风 / 摄像头（语音输入、拍照）。' : '注意：HTTPS 用的是自签名证书，浏览器会提示「不安全」，点「继续访问」即可。'}`)) return;
+  let d; try { d = await (await fetch('/api/server-mode', { method: 'POST', headers: H(), body: JSON.stringify({ httpOnly }) })).json(); } catch (e) { d = { ok: false, error: e.message }; }
+  if (!d.ok) return setMsg('svc-proto-msg', '切换失败：' + (d.error || ''), false);
+  let n = 8;
+  const tick = () => { setMsg('svc-proto-msg', `myhi 正在重启，${n} 秒后自动打开 ${url}（没跳转就手动打开它）`, true); if (n-- <= 0) location.href = url; else setTimeout(tick, 1000); };
+  tick();
+}
+
+// ── 出图 / 语音历史保留天数 ──
+async function loadHistDays() {
+  try { const d = await (await fetch('/api/history-retention', { headers: H() })).json(); document.getElementById('g-hist').value = d.days ? String(d.days) : ''; } catch {}
+}
+async function saveHistDays() {
+  const raw = document.getElementById('g-hist').value.trim();
+  const days = raw === '' ? 0 : Number(raw);
+  if (!Number.isInteger(days) || days < 0) return setMsg('g-hist-msg', '请填 0 或正整数（天）', false);
+  if (days > 0 && !confirm('保存后会立刻删除 ' + days + ' 天前的出图 / 语音历史（包括图片和录音），之后每天自动清理。确定？')) return;
+  try {
+    const d = await (await fetch('/api/history-retention', { method: 'POST', headers: H(), body: JSON.stringify({ days }) })).json();
+    if (!d.ok) throw new Error(d.error || '失败');
+    const p = d.purged || {}, n = (p.studio || 0) + (p.minutes || 0);
+    setMsg('g-hist-msg', d.days ? '已保存：保留 ' + d.days + ' 天' + (n ? '，刚清理了出图 ' + (p.studio || 0) + ' 条、语音 ' + (p.minutes || 0) + ' 条' : '') : '已保存：一直保留', true);
+  } catch (e) { setMsg('g-hist-msg', '保存失败：' + e.message, false); }
+}
+
+// ── 模型（按场景）：和首页 ⚙「系统设置 · 模型」同一份配置（config.json models）──
+// 下拉列网关上这个 token 可用的模型（按场景筛：主任务 / 子代理只列能用工具的，看图只列能看图的，出图只列出图模型），
+// 不在列表里的选「手填…」
+let _mFit = {};
+async function loadModels() {
+  let d;
+  try { d = await (await fetch('/api/models', { headers: H() })).json(); } catch (e) { document.getElementById('m-src').textContent = '读取失败：' + e.message; return; }
+  if (!d.ok) { document.getElementById('m-src').textContent = '读取失败：' + (d.error || ''); return; }
+  const src = document.getElementById('m-src'), rows = document.getElementById('m-rows'), saveRow = document.getElementById('m-save-row');
+  if (!d.gateway) {
+    src.textContent = '没有配置自定义网关：所有任务使用 Claude Code 默认模型，不需要选模型。在上面「大模型网关」里配置后，可在这里按场景从网关模型里选。';
+    rows.innerHTML = ''; saveRow.style.display = 'none'; return;
+  }
+  saveRow.style.display = '';
+  const ms = (d.models || []).filter((m) => !m.id.includes('*'));
+  const t = d.token, quota = t && (t.dailyLimit != null || t.monthlyLimit != null)
+    ? ' 积分：' + (t.dailyLimit != null ? '今日已用 ' + (t.dailyUsed ?? '?') + ' / ' + t.dailyLimit : '') + (t.monthlyLimit != null ? ' 本月已用 ' + (t.monthlyUsed ?? '?') + ' / ' + t.monthlyLimit : '') + '。' : '';
+  src.textContent = d.error ? '网关模型列表读取失败（' + d.error + '），可以选「手填…」填模型名。'
+    : '网关上有 ' + ms.length + ' 个模型' + (d.scoped ? '（这个 token 可用的）' : '（网关是旧版，未按 token 过滤，个别模型可能用不了）') + '，下拉选，不在列表里的选「手填…」。' + quota;
+  const meta = (m) => [m.name !== m.id ? m.name : '', m.kind === 'alias' && m.target ? '→ ' + m.target : '', (m.tags || []).includes('cheap') ? '便宜' : '', m.multiplier != null ? m.multiplier + 'x' : '', (m.caps || []).includes('vision') ? '能看图' : ''].filter(Boolean).join(' · ');
+  const cheapFirst = [...ms].sort((a, b) => ((b.tags || []).includes('cheap') - (a.tags || []).includes('cheap')));
+  const lists = {
+    tools: ms.filter((m) => !m.fit?.main),
+    all: cheapFirst,
+    vision: cheapFirst.filter((m) => (m.caps || []).includes('vision')),
+    image: ms.filter((m) => (m.caps || []).includes('image_generation') || m.image || (/(^|[-_/.])(image|cogview|seedream|wanx|flux|jimeng)/i.test(m.id) && !/vision|[-_]vl\b|ocr/i.test(m.id))),
+  };
+  const TOOL = { main: 1, plan: 1, subagent: 1, vision: 1, visionPro: 1 };
+  const listOf = (k) => k === 'image' ? lists.image : (k === 'vision' || k === 'visionPro') ? lists.vision : TOOL[k] ? lists.tools : lists.all;
+  _mFit = Object.fromEntries(ms.map((m) => [m.id, m]));
+  rows.innerHTML = Object.entries(d.sceneLabels || {}).map(([k, label]) => {
+    const cur = d.scenes?.[k] || '';
+    const list = listOf(k);
+    const inList = !cur || list.some((m) => m.id === cur);
+    const opts = ['<option value="">默认</option>']
+      .concat(list.map((m) => '<option value="' + escHtml(m.id) + '"' + (m.id === cur ? ' selected' : '') + '>' + escHtml(m.id) + (meta(m) ? '（' + escHtml(meta(m)) + '）' : '') + '</option>'))
+      .concat('<option value="__manual"' + (inList ? '' : ' selected') + '>手填…</option>').join('');
+    return '<div class="m-row" data-scene="' + escHtml(k) + '"><div class="m-lbl">' + escHtml(label) + '</div><div class="m-hint">' + escHtml(d.sceneHints?.[k] || '') + '</div>'
+      + '<div class="m-ctl' + (inList ? '' : ' manual') + '"><select>' + opts + '</select><input placeholder="模型名" autocomplete="off" spellcheck="false" value="' + escHtml(inList ? '' : cur) + '"></div>'
+      + '<div class="m-warn" style="display:none"></div></div>';
+  }).join('');
+  rows.querySelectorAll('.m-row').forEach((row) => {
+    const sel = row.querySelector('select'), inp = row.querySelector('input');
+    sel.onchange = () => { row.querySelector('.m-ctl').classList.toggle('manual', sel.value === '__manual'); if (sel.value === '__manual') inp.focus(); mCheck(); };
+    inp.oninput = mCheck;
+  });
+  mCheck();
+}
+const mVal = (row) => { const sel = row.querySelector('select'); return (sel.value === '__manual' ? row.querySelector('input').value : sel.value).trim(); };
+// 选了不适合这个场景的模型（不支持工具等）→ 行下提示原因（不硬拦：网关元数据可能没填全）
+function mCheck() {
+  const TOOL = { main: 1, plan: 1, subagent: 1, vision: 1, visionPro: 1 };
+  const mainRow = document.querySelector('#m-rows .m-row[data-scene="main"]');
+  const mainM = mainRow ? _mFit[mVal(mainRow)] : null;
+  document.querySelectorAll('#m-rows .m-row').forEach((row) => {
+    const k = row.dataset.scene, v = mVal(row), w = row.querySelector('.m-warn');
+    const why = TOOL[k] && _mFit[v]?.fit?.[k === 'visionPro' ? 'vision' : k];
+    const hint = k === 'vision' && !v && mainM?.caps?.length && !mainM.caps.includes('vision') ? '主任务模型 ' + mainM.name + ' 看不了图，建议配一个，否则发图片 AI 会读不出来' : '';
+    w.textContent = why ? '⚠ ' + why : hint ? '⚠ ' + hint : ''; w.style.display = why || hint ? '' : 'none';
+  });
+}
+async function saveModels() {
+  const body = {};
+  for (const row of document.querySelectorAll('#m-rows .m-row')) {
+    const v = mVal(row);
+    if (row.querySelector('select').value === '__manual' && !v) return setMsg('m-msg', '「' + row.querySelector('.m-lbl').textContent + '」选了手填，但没填模型名', false);
+    body[row.dataset.scene] = v;
+  }
+  try {
+    const d = await (await fetch('/api/model-scenes', { method: 'POST', headers: H(), body: JSON.stringify(body) })).json();
+    if (!d.ok) throw new Error(d.error || '失败');
+    setMsg('m-msg', '已保存：新开的任务马上生效；已开着的任务从下一条消息起生效（对话保留）', true);
+  } catch (e) { setMsg('m-msg', '保存失败：' + e.message, false); }
+}
+
+async function saveMachineName() {
+  try {
+    const r = await fetch('/api/machine-name', { method: 'POST', headers: H(), body: JSON.stringify({ name: document.getElementById('g-name').value.trim() }) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '失败');
+    setMsg('g-name-msg', `已保存为「${d.name}」，已打开的页面刷新后生效`, true);
+  } catch (e) { setMsg('g-name-msg', '保存失败：' + e.message, false); }
+}
+async function saveAsr() {
+  const url = document.getElementById('g-asr').value.trim();
+  try {
+    const r = await fetch('/api/server-config', { method: 'POST', headers: H(), body: JSON.stringify({ asrUrl: url }) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || '失败');
+    setMsg('g-asr-msg', url ? '已保存，重启 myhi 后生效（设了 ASR_URL 环境变量时以环境变量为准）' : '已清空，语音输入关闭', true);
+  } catch (e) { setMsg('g-asr-msg', '保存失败：' + e.message, false); }
+}
+
+async function loadGateway() {
+  try {
+    const r = await fetch('/api/gateway', { headers: H() });
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('gw-url').value = d.baseUrl || '';
+    document.getElementById('gw-key').placeholder = d.hasKey ? `已设置（${d.apiKey}），留空保持不变` : 'Token / API Key';
+    // 实际生效的网关：myhi 自己没配时会自动用环境变量 / Claude Code 配置里的
+    const SRC = { myhi: '本页配置', env: '启动 myhi 时的环境变量（ANTHROPIC_BASE_URL）', claude: 'Claude Code 配置（~/.claude/settings.json）' };
+    const e = d.effective;
+    document.getElementById('gw-src').textContent = !e
+      ? '还没有自定义网关：AI 直连 Anthropic（或用 claude 登录的账号），不提供模型选择。'
+      : e.source === 'myhi' ? `当前网关：${e.baseUrl}（Key ${e.apiKey}）`
+      : `当前网关：${e.baseUrl}（Key ${e.apiKey}）——自动读取自 ${SRC[e.source] || e.source}。要换成别的，在下面填写即可（这里填的优先）。`;
+    document.getElementById('gw-sync').checked = !!d.syncClaude;
+    if (d.claudeSettings) document.getElementById('gw-sync-hint').textContent = `终端里直接运行的 claude 也用这个网关。只改 ${d.claudeSettings} 里 env 的网关地址和 Key，其它设置不动，写之前先备份（.myhi-bak）；取消勾选会把写进去的删掉`;
+  } catch {}
+}
+
+async function saveGateway() {
+  const baseUrl = document.getElementById('gw-url').value.trim();
+  const apiKey = document.getElementById('gw-key').value.trim();
+  const msg = document.getElementById('gw-msg');
+  try {
+    const r = await fetch('/api/gateway', {
+      method: 'POST',
+      headers: H(),
+      body: JSON.stringify({ baseUrl, apiKey, syncClaude: document.getElementById('gw-sync').checked }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      msg.className = 'msg msg-ok';
+      msg.textContent = '已保存：新建的任务走新网关；已开着的任务从下一条消息起生效（对话保留）' + (d.synced ? '。已同步到 ' + d.synced + '，终端里新开的 claude 生效' : '');
+      document.getElementById('gw-key').value = '';
+      loadGateway();
+      loadModels();
+    } else {
+      msg.className = 'msg msg-err';
+      msg.textContent = d.error || '失败';
+    }
+  } catch {
+    msg.className = 'msg msg-err';
+    msg.textContent = '连接失败';
+  }
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/admin/status', { headers: H() });
+    if (r.status === 401) { doLogout(); return; }
+    const d = await r.json();
+
+    // 版本
+    document.getElementById('v-cur').textContent = 'v' + d.version.current;
+    const btn = document.getElementById('btn-up');
+    if (d.version.updateAvailable) {
+      document.getElementById('v-latest').innerHTML = '最新版本: <b>v' + d.version.latest + '</b>';
+      btn.disabled = false; btn.classList.add('glow'); btn.textContent = '升级到 v' + d.version.latest;
+    } else {
+      document.getElementById('v-latest').innerHTML = '<span style="color:#3fb950">已是最新版本</span>';
+      btn.disabled = true; btn.classList.remove('glow'); btn.textContent = '已是最新';
+    }
+
+    // Claude Code 版本（独立端点）
+    try {
+      const cr = await fetch('/api/claude/version', { headers: H() });
+      if (cr.ok) {
+        const cd = await cr.json();
+        document.getElementById('cl-cur').textContent = cd.current ? ('v' + cd.current) : '未安装';
+        const clBtn = document.getElementById('btn-cl-up');
+        _clInstalled = !!cd.current;
+        if (cd.upgrade?.running) {
+          document.getElementById('cl-latest').innerHTML = '<span style="color:#58a6ff">' + (cd.current ? '升级' : '安装') + '中...</span>';
+          clBtn.disabled = true; clBtn.textContent = (cd.current ? '升级' : '安装') + '中...';
+        } else if (!cd.current) {
+          // 没装（npm 装 myhi 不会顺带装它）：别显示「已是最新」，给安装按钮
+          document.getElementById('cl-latest').innerHTML = '<span style="color:#f0883e">AI 任务需要它，这台电脑上还没有</span>' + (cd.latest ? '，最新版 v' + cd.latest : '');
+          clBtn.disabled = false; clBtn.classList.add('glow'); clBtn.textContent = '安装 Claude Code';
+        } else if (cd.updateAvailable) {
+          document.getElementById('cl-latest').innerHTML = '最新版本: <b>v' + cd.latest + '</b>';
+          clBtn.disabled = false; clBtn.classList.add('glow'); clBtn.textContent = '升级到 v' + cd.latest;
+        } else {
+          document.getElementById('cl-latest').innerHTML = '<span style="color:#3fb950">已是最新版本</span>';
+          clBtn.disabled = true; clBtn.classList.remove('glow'); clBtn.textContent = '已是最新';
+        }
+      }
+    } catch {}
+
+    // 在线用户
+    const ouEl = document.getElementById('online-users');
+    if (!d.onlineUsers?.length) {
+      ouEl.innerHTML = '<div class="row" style="color:var(--muted)">无在线用户</div>';
+    } else {
+      ouEl.innerHTML = d.onlineUsers.map(u =>
+        `<div class="row"><span>${esc(u.name)}</span><span style="color:var(--muted)">${esc(u.role)}</span></div>`
+      ).join('');
+    }
+
+    // 活跃会话
+    const asEl = document.getElementById('active-sessions');
+    if (!d.sessions?.length) {
+      asEl.innerHTML = '<div class="row" style="color:var(--muted)">无活跃会话</div>';
+    } else {
+      asEl.innerHTML = d.sessions.map(s => {
+        const tag = s.mode === 'agent'
+          ? '<span style="display:inline-block;font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:4px;background:rgba(124,58,237,0.2);color:#a78bfa">Agent</span>'
+          : '<span style="display:inline-block;font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:4px;background:rgba(63,185,80,0.2);color:#3fb950">PTY</span>';
+        return `<div class="row"><span>${tag} ${esc(s.title)} <span style="color:var(--muted)">${esc(s.owner||'')}</span></span><span style="color:var(--muted)">${s.viewers}人</span></div>`;
+      }).join('');
+    }
+
+    // 用户列表
+    renderUsers(d.users || [], d.exclusive);
+
+    // 运行时长
+    if (d.uptime) {
+      const h = Math.floor(d.uptime / 3600), m = Math.floor((d.uptime % 3600) / 60);
+      document.getElementById('uptime').textContent = `服务运行 ${h}小时${m}分钟`;
+    }
+  } catch {}
+}
+
+// 使用模式：0～1 个登录账号 = 单用户（那个账号就是主人，全部权限）；≥2 个 = 多用户（账号变成成员，权限受限）
+let _users = [];
+function renderUsers(users, exclusive) {
+  _users = users;
+  const multi = users.length >= 2;
+  document.getElementById('mode-status').innerHTML = multi
+    ? `<b>当前：多用户模式 · ${users.length} 个成员</b><small>成员用各自密码登录，可以升级 / 重启，不能改全局设置；你用管理密码或二维码登录，权限不变。</small>`
+    : users.length === 1
+    ? `<b>当前：单用户模式 · 登录账号「${esc(users[0].name)}」</b><small>只有一个账号时它就是主人，用自己的密码登录、所有功能都能用，不需要来这里管理。再添加一个成员才进入多用户模式。</small>`
+    : `<b>当前：单用户模式</b><small>只有你在用，所有功能都能用。需要给别人用时再添加成员。</small>`;
+  document.getElementById('add-open').textContent = multi ? '＋ 添加成员' : users.length === 1 ? '＋ 添加成员，开启多用户模式' : '＋ 添加登录账号';
+  document.getElementById('excl-row').style.display = multi ? '' : 'none';
+  document.getElementById('excl-toggle').checked = !!exclusive;
+  document.getElementById('mode-foot').textContent = multi ? '删到只剩一个账号即回到单用户模式（剩下的那个拥有全部权限）。删除成员或重置密码后，他当前的登录会立即失效。' : '';
+  const el = document.getElementById('user-list');
+  el.innerHTML = users.map(u => `
+    <div class="row">
+      <span><b style="color:var(--text)">${esc(u.name)}</b> <span style="color:var(--muted);font-size:0.72rem">${u.dir ? '📁 ' + esc(u.dir) : '不限目录'}</span></span>
+      <div class="row-actions">
+        <button onclick="editUserPwd('${jsq(u.name)}')">重置密码</button>
+        <button class="del" onclick="delUser('${jsq(u.name)}')">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAddMember() {
+  document.getElementById('add-member').style.display = '';
+  document.getElementById('add-open').style.display = 'none';
+  document.getElementById('u-name').focus();
+}
+function closeAddMember() {
+  document.getElementById('add-member').style.display = 'none';
+  document.getElementById('add-open').style.display = '';
+  document.getElementById('dir-pick').style.display = 'none';
+}
+function genPwd() {
+  const cs = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const a = crypto.getRandomValues(new Uint32Array(8));
+  document.getElementById('u-pwd').value = [...a].map(n => cs[n % cs.length]).join('');
+}
+// 目录点选：复用 /api/dirs（主站以管理员身份登录时可用；不行就手动输入）
+async function pickDir(path) {
+  const box = document.getElementById('dir-pick');
+  box.style.display = '';
+  try {
+    const r = await fetch('/api/dirs' + (path ? '?path=' + encodeURIComponent(path) : ''));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.status);
+    document.getElementById('u-dir').value = d.current;
+    box.innerHTML = `<div class="cur">${esc(d.current)}</div>` +
+      (d.parent ? `<div data-p="${esc(d.parent)}">⬆ 上一级</div>` : '') +
+      (d.drives || []).map(x => `<div data-p="${esc(x)}">💽 ${esc(x)}</div>`).join('') +
+      d.dirs.map(x => `<div data-p="${esc(x.path)}">📁 ${esc(x.name)}</div>`).join('');
+    box.querySelectorAll('[data-p]').forEach(el => el.onclick = () => pickDir(el.dataset.p));
+  } catch (e) { box.innerHTML = `<div class="cur">无法浏览目录（${esc(e.message)}），请直接输入路径</div>`; }
+}
+
+async function setExclusive(on) {
+  try {
+    const r = await fetch('/api/admin/exclusive', { method: 'POST', headers: H(), body: JSON.stringify({ on }) });
+    const d = await r.json();
+    if (!d.ok) { alert(d.error || '失败'); refresh(); }
+  } catch { alert('连接失败'); refresh(); }
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+async function addUser() {
+  const pwd = document.getElementById('u-pwd').value.trim();
+  const name = document.getElementById('u-name').value.trim();
+  const dir = document.getElementById('u-dir').value.trim();
+  const msg = document.getElementById('u-msg');
+  if (!name || !pwd) { msg.className = 'msg msg-err'; msg.textContent = '成员名称和登录密码必填'; return; }
+  // 第二个账号 = 从单用户切到多用户：先讲清楚会发生什么（尤其原来那个账号会降为成员）
+  if (_users.length === 1 && !confirm(
+    '添加后共 2 个账号，myhi 进入「多用户模式」：\n\n' +
+    `· 原来的账号「${_users[0].name}」和新成员都变成「成员」，各用自己的密码登录` + (dir ? '，新成员只能在绑定的目录里建任务' : '') + '；\n' +
+    '· 成员可以升级、重启，但不能改全局设置（本机显示名、语音、用户、网关等）；\n' +
+    '· 你（管理员）照常用管理密码或二维码登录，权限不变。\n\n' +
+    '以后删到只剩一个账号即回到单用户模式。确定添加？')) return;
+  try {
+    const r = await fetch('/api/admin/user', { method: 'POST', headers: H(), body: JSON.stringify({ password: pwd, name, dir }) });
+    const d = await r.json();
+    if (d.ok) {
+      msg.className = 'msg msg-ok'; msg.textContent = `已添加「${name}」，登录密码：${pwd}（请告知对方）`;
+      ['u-pwd', 'u-name', 'u-dir'].forEach(id => document.getElementById(id).value = '');
+      closeAddMember(); refresh();
+    } else { msg.className = 'msg msg-err'; msg.textContent = d.error || '失败'; }
+  } catch { msg.className = 'msg msg-err'; msg.textContent = '连接失败'; }
+}
+
+async function editUserPwd(name) {
+  const newPwd = prompt(`为 ${name} 设置新的登录密码（至少 4 位，设置后他当前的登录会失效）：`);
+  if (!newPwd) return;
+  try {
+    const r = await fetch('/api/admin/user/password', { method: 'POST', headers: H(), body: JSON.stringify({ name, password: newPwd }) });
+    const d = await r.json();
+    if (d.ok) { alert('密码已修改'); refresh(); }
+    else alert(d.error || '失败');
+  } catch { alert('连接失败'); }
+}
+
+async function delUser(name) {
+  if (!confirm(`确定删除「${name}」？他当前的登录会立即失效。` + (_users.length === 2 ? `\n\n删除后只剩「${_users.find(u => u.name !== name)?.name}」一个账号，回到单用户模式，它将拥有全部权限。` : _users.length === 1 ? '\n\n这是最后一个登录账号，删除后只能用管理密码登录。' : ''))) return;
+  try {
+    const r = await fetch('/api/admin/user', { method: 'DELETE', headers: H(), body: JSON.stringify({ name }) });
+    const d = await r.json();
+    if (d.ok) refresh();
+    else alert(d.error || '失败');
+  } catch { alert('连接失败'); }
+}
+
+async function changePwd() {
+  const pwd = document.getElementById('new-pwd').value.trim();
+  const msg = document.getElementById('pwd-msg');
+  if (!pwd || pwd.length < 4) { msg.className = 'msg msg-err'; msg.textContent = '密码至少4位'; return; }
+  try {
+    const r = await fetch('/api/admin/password', { method: 'POST', headers: H(), body: JSON.stringify({ password: pwd }) });
+    const d = await r.json();
+    if (d.ok) { msg.className = 'msg msg-ok'; msg.textContent = '已修改'; document.getElementById('new-pwd').value = ''; }
+    else { msg.className = 'msg msg-err'; msg.textContent = d.error || '失败'; }
+  } catch { msg.className = 'msg msg-err'; msg.textContent = '连接失败'; }
+}
+
+// 等升级落地：轮询 /api/version（重启/停服期间连不上是正常的）。
+// 成功 = 版本变了（且等于目标）；失败 = 服务端报了本次升级的失败原因；10 分钟兜底超时。
+async function waitUpgrade(from, target, onTick) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < 10 * 60 * 1000) {
+    await new Promise(r => setTimeout(r, 3000));
+    let v = null;
+    try { const r = await fetch('/api/version', { cache: 'no-store' }); if (r.ok) v = await r.json(); } catch {}
+    onTick?.(!!v, Math.round((Date.now() - t0) / 1000));
+    if (!v) continue;
+    if (v.current !== from && (!target || v.current === target)) return { ok: true, version: v.current };
+    const last = v.upgrade?.last;
+    if (!v.upgrade?.running && last && !last.ok && last.at >= t0 - 5000) return { ok: false, error: last.error };
+  }
+  return { ok: false, error: '等了 10 分钟仍未完成，请稍后刷新页面查看版本，或到服务器上查看 myhi log' };
+}
+async function doUpgrade(force) {
+  const btn = document.getElementById('btn-up'), msg = document.getElementById('op-msg');
+  const fail = (t) => { msg.textContent = '失败: ' + t; btn.disabled = false; btn.textContent = '重试'; };
+  btn.disabled = true; btn.textContent = '升级中...'; msg.textContent = '正在提交升级...'; msg.style.display = '';
+  try {
+    const r = await fetch('/api/admin/upgrade', { method: 'POST', headers: { ...H(), 'Content-Type': 'application/json' }, body: JSON.stringify({ force: !!force }) });
+    const d = await r.json().catch(() => ({}));
+    if (!d.ok) {
+      if (d.busy?.length && confirm(d.error + '\n\n仍然现在升级吗？')) return doUpgrade(true);
+      return fail(d.error || ('HTTP ' + r.status));
+    }
+    msg.textContent = d.message || '升级中...';
+    const res = await waitUpgrade(d.from, d.target, (up, sec) => { msg.textContent = (up ? '正在安装新版本… ' : '服务重启中… ') + sec + 's'; });
+    if (res.ok) { msg.textContent = '已升级到 v' + res.version + '，即将刷新'; setTimeout(() => location.reload(), 800); }
+    else fail(res.error);
+  } catch { fail('连接失败'); }
+}
+
+let _clInstalled = true;
+async function doClaudeUpgrade() {
+  const btn = document.getElementById('btn-cl-up'), msg = document.getElementById('cl-msg');
+  const verb = _clInstalled ? '升级' : '安装';
+  if (!confirm(_clInstalled
+    ? '升级 Claude Code？\nmyhi 会用 npm --include=optional 装全平台二进制，避免占位符坑。\n不影响正在跑的会话，升级后新查询生效。'
+    : '安装 Claude Code（myhi 的 AI 引擎）？\n下载约 260MB，需要几分钟。装好后还要在这台电脑上运行一次 claude 登录，或配置下方的大模型网关。')) return;
+  btn.disabled = true; btn.textContent = verb + '中...'; msg.className = 'status-msg'; msg.textContent = '正在下载安装（~260MB，可能几分钟）...'; msg.style.display = '';
+  try {
+    const r = await fetch('/api/claude/update', { method: 'POST', headers: H() });
+    const d = await r.json();
+    if (!d.ok) { msg.textContent = '失败: ' + (d.error||''); btn.disabled = false; btn.textContent = '重试'; return; }
+    const poll = setInterval(async () => {
+      try {
+        const sr = await fetch('/api/claude/update-status', { headers: H() });
+        const s = await sr.json();
+        if (!s.running) {
+          clearInterval(poll);
+          if (s.ok) { msg.textContent = (_clInstalled ? '已升级到 v' : '已安装 v') + s.version + (_clInstalled ? '' : '。还差一步：在这台电脑上运行一次 claude 登录，或配置下方的大模型网关'); setTimeout(refresh, 500); }
+          else { msg.textContent = '失败: ' + (s.error||''); btn.disabled = false; btn.textContent = '重试'; }
+        }
+      } catch {}
+    }, 4000);
+  } catch { msg.textContent = '连接失败'; btn.disabled = false; btn.textContent = '重试'; }
+}
+
+async function doRestart() {
+  if (!confirm('确定重启？')) return;
+  const msg = document.getElementById('op-msg');
+  msg.textContent = '重启中...'; msg.style.display = '';
+  try { await fetch('/api/admin/restart', { method: 'POST', headers: H() }); } catch {}
+  waitReload();
+}
+
+async function waitReload() {
+  await new Promise(r => setTimeout(r, 3000));
+  for (let i = 0; i < 30; i++) {
+    try { const r = await fetch('/api/version'); if (r.ok) { location.reload(); return; } } catch {}
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  document.getElementById('op-msg').textContent = '重启超时，请手动刷新';
+}
+
+// 主站已是管理员 → 直接换后台令牌免登录；否则沿用本标签页已有令牌（重启后会失效）或显示登录框
+(async () => {
+  try {
+    const r = await fetch('/api/admin/sso', { method: 'POST' });
+    const d = r.ok ? await r.json() : null;
+    if (d?.ok) { T = d.token; sessionStorage.setItem('myhi_admin', T); return showAdmin(); }
+  } catch {}
+  if (T) showAdmin();
+})();
+</script>
+</body>
+</html>
