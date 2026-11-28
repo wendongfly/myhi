@@ -10,6 +10,10 @@
 
 Images mentioned in AI replies, and images opened by tools (e.g. Read), are now shown inline as thumbnails. Display only — they are never attached to the next prompt.
 
+- **新增 Windows 11 WSL Ubuntu 一键安装器**（installer/wsl/）：双击 .bat 开 WSL、装 Ubuntu、配 systemd 与 mirrored 网络（手机平板局域网直达）、防火墙放行，并可顺手复用 Linux 安装器把 myhi 装进 WSL（详见 installer/wsl/README.md）。
+
+New one-click WSL Ubuntu installer for Windows 11 (installer/wsl/).
+
 ## 1.3.230 — 安全更新 / Security update
 
 - **依赖漏洞修复**：升级 express 4.22.3、socket.io / socket.io-client 4.8.4、multer 2.5.0 及其间接依赖（engine.io、ws、socket.io-parser、body-parser、proxy-addr、qs、node-forge），`npm audit` 0 个漏洞。其中最要紧的是 Socket.IO 底层**无需登录**即可触发的拒绝服务；这些包虽列在 devDependencies，但会被打包进 `dist/` 随 npm 包发布，**建议所有用户升级**。
