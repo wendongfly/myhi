@@ -2,6 +2,14 @@
 
 最新版本在上。This project follows the npm package versions of `@wendongfly/myhi`.
 
+## 1.3.231 — 会话里直接显示图片 / Inline images in chat
+
+- **AI 回复里提到的图片**：路径变成可点的链接，回复下方直接显示缩略图，点开看大图；文件不存在或在任务目录外时自动隐藏。
+- **AI 用工具打开 / 截到的图片**：显示在工具调用下方（不用展开折叠的工具调用）。实时显示用工具结果里的图片数据，任务目录外的图也能看；刷新或换设备回放时按文件路径加载（限任务目录内）。
+- **只是显示**：缩略图不进对话记录、不附到输入框，也不会作为下一轮发给模型的图片。
+
+Images mentioned in AI replies, and images opened by tools (e.g. Read), are now shown inline as thumbnails. Display only — they are never attached to the next prompt.
+
 ## 1.3.230 — 安全更新 / Security update
 
 - **依赖漏洞修复**：升级 express 4.22.3、socket.io / socket.io-client 4.8.4、multer 2.5.0 及其间接依赖（engine.io、ws、socket.io-parser、body-parser、proxy-addr、qs、node-forge），`npm audit` 0 个漏洞。其中最要紧的是 Socket.IO 底层**无需登录**即可触发的拒绝服务；这些包虽列在 devDependencies，但会被打包进 `dist/` 随 npm 包发布，**建议所有用户升级**。
