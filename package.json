@@ -1,6 +1,6 @@
 {
   "name": "@wendongfly/myhi",
-  "version": "1.3.230",
+  "version": "1.3.231",
   "description": "Web-based terminal sharing with chat UI — control your terminal from phone via LAN/Tailscale",
   "type": "module",
   "main": "dist/index.js",

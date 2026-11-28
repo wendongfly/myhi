@@ -512,6 +512,12 @@
 
     /* ── 文件在线编辑（聊天里/文件列表里点文本文件路径）── */
     .file-link { color: var(--blue); text-decoration: underline; cursor: pointer; text-underline-offset: 2px; }
+    /* AI 生成的图片：回复里提到的图片路径直接显示缩略图（只是显示，不进对话、不作为下一轮的输入图片）*/
+    .gen-imgs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+    .gen-img-w.file-link { text-decoration: none; display: inline-block; line-height: 0; }
+    .msg-gen-imgs { margin: 0.1rem 0 0.4rem 0.3rem; }
+    .gen-img-data { display: inline-block; line-height: 0; cursor: zoom-in; }
+    .gen-img { max-width: min(260px, 100%); max-height: 260px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); object-fit: contain; cursor: zoom-in; }
     .file-link:active { opacity: 0.7; }
     #fedit-ta {
       width: 100%; flex: 1; min-height: 0; box-sizing: border-box; display: none;
@@ -1909,7 +1915,12 @@
     // 括号类（全角（）【】《》、半角 () []）也算路径字符：AI 常生成「2027年度经营计划书（完整版）.md」这种文件名，
     // 以前括号一断整段认不出来；句子里包住路径的括号（「已生成（docs/a.md）」）由 matchPathsInText 去掉
     const _PATH_CHARS = "[\\w.\\-\\u4e00-\\u9fa5\\\\/（）【】《》()\\[\\]]";
-    const _PATH_RE = new RegExp(_PATH_CHARS + "+\\.(" + [...FEDIT_EXT].join('|') + ")", "gi");
+    // 图片也识别成可点的链接（点开是图片预览），并在回复下方显示缩略图
+    const GEN_IMG_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
+    const _PATH_RE = new RegExp(_PATH_CHARS + "+\\.(" + [...new Set([...FEDIT_EXT, ...GEN_IMG_EXT])].join('|') + ")(?![A-Za-z0-9])", "gi");
+    const _GEN_IMG_RE = new RegExp("\\.(" + GEN_IMG_EXT.join('|') + ")$", "i");
+    // 缩略图地址带「轮次」：同一轮内不变（流式重绘不闪），新一轮换值——AI 重新生成同名图片时新消息显示新图，旧消息保持当时的样子
+    let _genImgVer = Date.now();
     // 从一段纯文本里找出可点的路径。抽成纯函数：linkify 的 DOM 遍历用它，离线单测也直接 eval 它。
     // 命中前一个字符的特判：是 'D:' 盘符 → 把盘符并进链接；是 'https:' / '@'（邮箱）/ '/'（URL 尾）→ 跳过。
     function matchPathsInText(s) {
@@ -1962,6 +1973,7 @@
       });
       const texts = [];
       while (walker.nextNode()) texts.push(walker.currentNode);
+      const imgs = [];   // 本段回复里提到的图片（去重，最多 6 张；用户上传目录里的不算「生成的图片」）
       for (const node of texts) {
         const s = node.nodeValue;
         const hits = matchPathsInText(s);
@@ -1976,13 +1988,115 @@
           a.textContent = h.text;
           a.dataset.path = h.text;
           frag.appendChild(a);
+          if (_GEN_IMG_RE.test(h.text) && !/(^|[\\/])uploads?[\\/]/i.test(h.text) && !imgs.includes(h.text) && imgs.length < 6) imgs.push(h.text);
           last = h.start + h.text.length;
         }
         if (last < s.length) frag.appendChild(document.createTextNode(s.slice(last)));
         node.parentNode.replaceChild(frag, node);
       }
+      // 缩略图：从任务目录按路径直接加载（只在浏览器里显示，不进对话记录，也不会附到输入框、不作为下一轮发给模型的图片）。
+      // 文件不存在 / 在任务目录外（服务端拒绝）就自动隐藏；点一下打开大图预览
+      if (imgs.length && typeof SESSION_ID !== 'undefined' && SESSION_ID) {
+        const wrap = document.createElement('div');
+        wrap.className = 'gen-imgs';
+        for (const p of imgs) {
+          const rel = feditNormPath(p);
+          if (!rel) continue;
+          const w = document.createElement('span');
+          w.className = 'file-link gen-img-w';
+          w.dataset.path = p;
+          w.title = '点击查看大图：' + p;
+          const img = document.createElement('img');
+          img.className = 'gen-img';
+          img.loading = 'lazy';
+          img.alt = p.split(/[\\/]/).pop();
+          img.src = `/api/files/${SESSION_ID}/download?path=${encodeURIComponent(rel)}&inline=1&v=${_genImgVer}`;
+          w.appendChild(img);
+          wrap.appendChild(w);
+        }
+        if (wrap.childNodes.length) box.appendChild(wrap);
+      }
       return box.innerHTML;
     }
+    // ── AI 用工具打开 / 截到的图片：直接显示在工具调用后面（折叠组外面，不用展开就能看）──
+    //   以前工具结果里的图片聊天里根本不显示，AI 说「二维码就在上面这张图里」用户却看不到。
+    //   只是显示：不进对话记录、不附到输入框、不作为下一轮发给模型的图片。
+    //   实时：优先用工具结果里的图片数据（任务目录外的图也能看）；回放历史（数据已被剥离）：按 Read 的文件路径加载（限任务目录内）
+    const _toolImgPath = new Map();   // tool_use id → AI 用 Read 打开的图片路径
+    const _toolImgSkip = new Set();   // Read 的是用户上传的图：用户自己发过，不重复显示
+    const _toolImgShown = new Set();
+    const _isUploadPath = (p) => /(^|[\\/])uploads?[\\/]/i.test(p);
+    function noteToolImage(name, input, id) {
+      if (name !== 'Read' || !input || !id) return null;
+      const p = String(input.file_path || input.path || '');
+      if (!_GEN_IMG_RE.test(p)) return null;
+      if (_isUploadPath(p)) { _toolImgSkip.add(id); return null; }
+      _toolImgPath.set(id, p);
+      return p;
+    }
+    function addToolImages(items, id) {
+      if (!items.length || (id && _toolImgShown.has(id))) return;
+      if (id) _toolImgShown.add(id);
+      endToolGroup();
+      const host = _replayParent || chatArea;
+      const el = document.createElement('div');
+      el.className = 'msg msg-gen-imgs';
+      const wrap = document.createElement('div');
+      wrap.className = 'gen-imgs';
+      for (const it of items) {
+        const w = document.createElement('span');
+        const img = document.createElement('img');
+        img.className = 'gen-img';
+        img.loading = 'lazy';
+        img.alt = it.alt || (it.path ? it.path.split(/[\\/]/).pop() : '图片');
+        if (it.path) {
+          const rel = feditNormPath(it.path);
+          if (!rel) continue;
+          w.className = 'file-link gen-img-w';
+          w.dataset.path = it.path;
+          w.title = '点击查看大图：' + it.path;
+          img.src = `/api/files/${SESSION_ID}/download?path=${encodeURIComponent(rel)}&inline=1&v=${_genImgVer}`;
+        } else {
+          w.className = 'gen-img-w gen-img-data';
+          w.title = '点击查看大图';
+          img.src = it.src;
+        }
+        w.appendChild(img);
+        wrap.appendChild(w);
+      }
+      if (!wrap.childNodes.length) return;
+      el.appendChild(wrap);
+      host.appendChild(el);
+      if (!_replayParent) scrollToBottom();
+    }
+    // 实时的工具结果（claude 的 user 事件里的 tool_result 块）
+    function showToolResultImages(b) {
+      const id = b?.tool_use_id;
+      if (!id || _toolImgSkip.has(id) || _toolImgShown.has(id)) return;
+      const items = [];
+      const path = _toolImgPath.get(id);
+      for (const c of Array.isArray(b.content) ? b.content : []) {
+        const d = c?.type === 'image' && c.source?.type === 'base64' ? String(c.source.data || '') : '';
+        if (d && !d.startsWith('[STRIPPED') && d.length < 6e6 && /^[A-Za-z0-9+/=\s]+$/.test(d.slice(0, 200))) {
+          const mt = /^image\/(png|jpe?g|gif|webp|bmp)$/i.test(c.source.media_type || '') ? c.source.media_type : 'image/png';
+          items.push({ src: `data:${mt};base64,${d}`, alt: path ? path.split(/[\\/]/).pop() : '图片' });
+        }
+      }
+      if (!items.length && path) items.push({ path });
+      addToolImages(items, id);
+    }
+    // 没有文件路径的图片（如截图工具返回的）：用同一个查看器看大图
+    document.addEventListener('click', (e) => {
+      const w = e.target?.closest?.('.gen-img-data');
+      if (!w) return;
+      const img = w.querySelector('img');
+      if (img) fvShowData(img.src, img.alt);
+    });
+
+    document.addEventListener('error', (e) => {
+      const t = e.target;
+      if (t && t.classList && t.classList.contains('gen-img')) { const w = t.closest('.gen-img-w'); const box = w?.parentNode; w?.remove(); if (box && !box.childNodes.length) box.remove(); }
+    }, true);
     // 聊天流/记忆面板里所有 .file-link 点击统一走这里（渲染时委托，动态节点免绑）
     document.addEventListener('click', (e) => {
       const el = e.target && e.target.closest ? e.target.closest('.file-link') : null;
@@ -2747,6 +2861,8 @@
               subaCreatePanel(block.id, subagentToolInfo(block.input || {}), { done: false });
             } else {
               addToolMessage(JSON.stringify(block.input || {}, null, 2), block.name || '工具', toolSummary(block.name, block.input || {}));
+              const ip = noteToolImage(block.name, block.input, block.id);
+              if (ip) addToolImages([{ path: ip }], block.id);   // 回放时图片数据已剥离，按路径加载
             }
           }
         }
@@ -3357,6 +3473,10 @@
           // 只有字符串 content 才可能是真人/草稿发言；claude 原生 user 事件带数组 content
           // （tool_result 块）不是用户说话，别渲染成气泡
           if (msg.from && msg.from === socket.id) break;   // 自己发的，sendCommand 时已经画过
+          {
+            const arr = Array.isArray(msg.message?.content) ? msg.message.content : Array.isArray(msg.content) ? msg.content : null;
+            if (arr) for (const b of arr) if (b?.type === 'tool_result') showToolResultImages(b);
+          }
           if (msg.content && typeof msg.content === 'string') {
             endStream();
             const kind = syntheticUserKind(msg.content);
@@ -3402,8 +3522,10 @@
                   subaCreatePanel(block.id, subagentToolInfo(block.input || {}));
                 } else {
                   addToolMessage(JSON.stringify(block.input || {}, null, 2), block.name || '工具', toolSummary(block.name, block.input || {}));
+                  noteToolImage(block.name, block.input, block.id);
                 }
               } else if (block.type === 'tool_result') {
+                showToolResultImages(block);
                 const content = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
                 if (!subaTryComplete(block.tool_use_id, content)) addRawOutput(content, true);
               }
@@ -3413,6 +3535,7 @@
           break;
         case 'result':
           removeThinking();
+          _genImgVer = Date.now();   // 下一轮里再提到同名图片时显示新生成的版本
           // msg.result 是整轮的最终答复文本，纯文字回答时与本轮已渲染的文本重复；
           // 本轮已经通过流式或 assistant 事件渲染过就跳过，避免生成第二个独立气泡
           if (msg.result && !_textRenderedThisTurn) {
@@ -3479,6 +3602,7 @@
             subaCreatePanel(msg.id, subagentToolInfo(msg.input || {}));
           } else {
             addToolMessage(JSON.stringify(msg.input || {}, null, 2), msg.name || '工具');
+            noteToolImage(msg.name, msg.input, msg.id);
           }
           setWorkState('working');
           break;
@@ -3486,6 +3610,7 @@
           // 独立工具结果消息。同时作为 call 边界兜底：如果某适配器没发 message_start，
           // 这里重置 call 标志能保证后续 assistant 文本不被前一个 call 的标志误吃
           _streamedTextThisCall = false;
+          showToolResultImages({ tool_use_id: msg.tool_use_id, content: msg.content });
           if (msg.content && !seenInReplay({ type: 'tool_result', tool_use_id: msg.tool_use_id })) {
             const text = typeof msg.content === 'string' ? msg.content
               : Array.isArray(msg.content) ? msg.content.map(b => b.text || '').join('\n')
@@ -4539,6 +4664,22 @@
       _fvIdx = Math.max(0, _fvList.indexOf(rel));
       document.getElementById('fp-viewer').classList.add('open');
       fvShow();
+    };
+    window.fvShowData = function(src, name) {
+      const v = document.getElementById('fp-viewer'), body = document.getElementById('fv-body');
+      _fvList = []; _fvIdx = 0;
+      v.classList.remove('multi'); v.classList.add('open');
+      document.getElementById('fv-name').textContent = name || '图片';
+      document.getElementById('fv-path').textContent = 'AI 打开的图片（只在这里显示，不会发给 AI）';
+      const blobUrl = async () => URL.createObjectURL(await (await fetch(src)).blob());   // 浏览器不许直接打开 data: 地址
+      document.getElementById('fv-open').onclick = async () => window.open(await blobUrl(), '_blank');
+      document.getElementById('fv-dl').onclick = async () => { const a = document.createElement('a'); a.href = await blobUrl(); a.download = name || 'image.png'; a.click(); };
+      body.classList.remove('zoomed');
+      body.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = src; img.alt = '';
+      img.onclick = () => { img.classList.toggle('zoom'); body.classList.toggle('zoomed', img.classList.contains('zoom')); };
+      body.appendChild(img);
     };
     function fvShow() {
       const rel = _fvList[_fvIdx], kind = previewKind(rel), url = fvUrl(rel, true);
