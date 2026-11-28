@@ -2,6 +2,8 @@
 
 给普通员工用的一键安装：**双击一个文件，装好后开机登录自动在后台运行，全程不用开终端、不用敲命令**。
 
+> 其他平台：Linux 原生机看 [`linux/`](linux/README.md)；**Windows 11 上走 WSL Ubuntu**（要 systemd 服务形态、或统一 Linux 部署口径）看 [`wsl/`](wsl/README.md)——双击 `wsl/Install-wsl-ubuntu.bat`，开 WSL + 装 Ubuntu + 顺手把 myhi 装进去（mirrored 网络，手机平板局域网直达）。
+
 ## 员工怎么用
 
 1. 把整个 `installer` 文件夹拷到员工电脑（或发压缩包）。
